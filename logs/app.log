@@ -1,0 +1,18 @@
+2025-09-27 19:53:00,612 - ChatApp - DEBUG - Logging system initialized (first setup).
+2025-09-27 19:53:00,683 - ChatApp - DEBUG - Unauthenticated user visited main page.
+2025-09-27 19:53:45,104 - ChatApp - INFO - User 'Akash_A' authenticated successfully.
+2025-09-27 19:53:57,748 - ChatApp - INFO - User Akash_A entered: ljqdv
+2025-09-27 19:53:58,750 - ChatApp - DEBUG - LLM 'claude-3' generating response for prompt: ljqdv
+2025-09-27 19:53:58,750 - ChatApp - INFO - LLM claude-3 responded successfully.
+2025-09-27 19:54:07,062 - ChatApp - INFO - User Akash_A entered: sdbvj,a
+2025-09-27 19:54:08,063 - ChatApp - DEBUG - LLM 'gpt-4' generating response for prompt: sdbvj,a
+2025-09-27 19:54:08,063 - ChatApp - INFO - LLM gpt-4 responded successfully.
+2025-09-27 19:54:30,972 - ChatApp - INFO - User Akash_A entered: kndv
+2025-09-27 19:54:31,973 - ChatApp - DEBUG - LLM 'llama-3' generating response for prompt: kndv
+2025-09-27 19:54:31,973 - ChatApp - INFO - LLM llama-3 responded successfully.
+2025-09-27 20:09:17,402 - ChatApp - DEBUG - Logging system initialized (first setup).
+2025-09-27 20:09:17,453 - ChatApp - DEBUG - Unauthenticated user visited main page.
+2025-09-27 20:09:34,100 - ChatApp - INFO - User 'Akash_A' authenticated successfully.
+2025-09-27 20:09:42,140 - ChatApp - INFO - User Akash_A entered: hfxfhudyl
+2025-09-27 20:09:43,141 - ChatApp - DEBUG - LLM 'gpt-4' generating response for prompt: hfxfhudyl
+2025-09-27 20:09:43,142 - ChatApp - INFO - LLM gpt-4 responded successfully.
