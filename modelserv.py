@@ -1,76 +1,82 @@
 #!/usr/bin/env python3
 """
-WebSocket server that exposes Llama-3.2 (Ollama) to remote clients.
-pip install aiohttp ollama
+FastAPI WebSocket server that exposes Llama-3.2 (Ollama) to remote clients.
 """
-
 import asyncio
-import json
 import logging
-from aiohttp import web, WSMsgType
-from ollama import AsyncClient
+from typing import Dict
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from ollama import AsyncClient  # pip install ollama
 
 HOST = "0.0.0.0"
 PORT = 8765
-MODEL  = "llama3.2"
+MODEL = "llama3.2"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [S] %(message)s")
-log = logging.getLogger("ws-server")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [F] %(message)s")
+log = logging.getLogger("fastapi-ws")
 
-# --------------------------------------------------------------------------- #
-# Application-wide Ollama client (single instance)
-# --------------------------------------------------------------------------- #
+app = FastAPI()
 ollama = AsyncClient()
 
-# --------------------------------------------------------------------------- #
-# WebSocket handler
-# --------------------------------------------------------------------------- #
-async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
+# simple connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active: Dict[str, WebSocket] = {}
 
-    peer = request.transport.get_extra_info('peername')  # (ip, port)
-    client = f"{request.remote}:{peer[1]}"
-    log.info("Client %s connected", client)
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        self.active[ws.client.host] = ws
+        log.info("Client %s connected", ws.client.host)
 
-    async for msg in ws:
-        if msg.type == WSMsgType.TEXT:
+    def disconnect(self, ws: WebSocket):
+        self.active.pop(ws.client.host, None)
+        log.info("Client %s disconnected", ws.client.host)
+
+    async def send_json(self, ws: WebSocket, data: dict):
+        try:
+            await ws.send_json(data)
+        except Exception:
+            pass  # client gone
+
+manager = ConnectionManager()
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await manager.connect(ws)
+    try:
+        while True:
+            # expect {"prompt": "..."}
+            msg = await ws.receive_json()
+            prompt = msg.get("prompt", "")
+            log.info("Prompt (%d chars) from %s", len(prompt), ws.client.host)
+
             try:
-                data = json.loads(msg.data)
-                prompt = data["prompt"]
-                log.info("Prompt (%d chars) from %s", len(prompt), client)
-
-                # Stream tokens from Ollama
                 async for part in await ollama.chat(
                     model=MODEL,
                     messages=[{"role": "user", "content": prompt}],
-                    stream=True
+                    stream=True,
                 ):
                     delta = part["message"]["content"]
-                    await ws.send_str(json.dumps({"token": delta}))
+                    await manager.send_json(ws, {"token": delta})
 
-                # End-of-stream sentinel
-                await ws.send_str(json.dumps({"token": None}))
+                # end-of-stream sentinel
+                await manager.send_json(ws, {"token": None})
 
             except Exception as exc:
                 log.exception("Error while processing prompt")
-                await ws.send_str(json.dumps({"error": str(exc)}))
+                await manager.send_json(ws, {"error": str(exc)})
 
-        elif msg.type == WSMsgType.ERROR:
-            log.error("WS error %s", ws.exception())
-
-    log.info("Client %s disconnected", client)
-    return ws
+    except WebSocketDisconnect:
+        manager.disconnect(ws)
 
 
-# --------------------------------------------------------------------------- #
-# Build & run
-# --------------------------------------------------------------------------- #
-def build_app() -> web.Application:
-    app = web.Application()
-    app.router.add_get("/ws", websocket_handler)
-    return app
+@app.get("/")
+async def health():
+    return "FastAPI Llama-3.2 WebSocket server is running."
 
 
 if __name__ == "__main__":
-    web.run_app(build_app(), host=HOST, port=PORT)
+    import uvicorn
+    uvicorn.run("server:app", host=HOST, port=PORT, log_level="info")

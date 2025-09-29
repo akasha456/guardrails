@@ -1,79 +1,55 @@
 import streamlit as st
 import time
-import json
-import threading
 import queue
-import websocket
+import asyncio
+import websockets
+import json
 from datetime import datetime
 import logging
 
 # --------------------------------------------------------------------------- #
-# Logging (kept exactly like you had it)
+# Logging (unchanged)
 # --------------------------------------------------------------------------- #
 logger = logging.getLogger("ChatApp")
 
 # --------------------------------------------------------------------------- #
-# WebSocket client (tiny, self-contained)
+# FastAPI WebSocket client (tiny, self-contained)
 # --------------------------------------------------------------------------- #
-WS_URL = "ws://localhost:8765/ws"   # the server.py endpoint
+WS_URL = "ws://localhost:8765/ws"
 
 class WsClient:
-    """Thread-safe WebSocket bridge to our llama-3.2 server."""
+    """Thin async→sync bridge for FastAPI WebSocket."""
     def __init__(self, url: str):
         self.url = url
-        self._q: "queue.Queue[dict]" = queue.Queue()
-        self._ws: websocket.WebSocketApp | None = None
-        self._thread: threading.Thread | None = None
-
-    # ---------- internal ----------
-    def _run(self):
-        def on_open(ws):
-            logger.info("WebSocket connection opened to %s", self.url)
-
-        def on_message(_ws, msg):
-            self._q.put(json.loads(msg))
-
-        def on_error(_ws, err):
-            logger.error("WebSocket error: %s", err)
-            self._q.put({"error": str(err)})
-
-        def on_close(_ws, close_status_code, close_msg):
-            logger.info("WebSocket closed – code=%s  msg=%s", close_status_code, close_msg)
-
-        self._ws = websocket.WebSocketApp(
-            self.url,
-            on_open=on_open,
-            on_message=on_message,
-            on_error=on_error,
-            on_close=on_close,
-        )
-        self._ws.run_forever()
+        self._q = queue.Queue()
 
     # ---------- public ----------
-    def start(self):
-        if self._thread and self._thread.is_alive():
-            return
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
     def send_prompt(self, prompt: str):
-        if not self._ws or not self._ws.sock or not self._ws.sock.connected:
-            st.error("Not connected to server – please refresh page")
-            return
-        payload = json.dumps({"prompt": prompt})
-        logger.debug("Sending prompt (%d chars)", len(prompt))
-        self._ws.send(payload)
+        asyncio.run(self._async_send(prompt))
 
     def stream(self):
         """Generator that yields tokens (str) OR error dict."""
         while True:
             item = self._q.get()
             if "token" in item:
-                if item["token"] is None:   # end-of-stream sentinel
+                if item["token"] is None:
                     break
                 yield item["token"]
-            else:                           # error
+            else:
                 yield item
+
+    # ---------- internal ----------
+    async def _async_send(self, prompt: str):
+        try:
+            async with websockets.connect(self.url) as ws:
+                await ws.send(json.dumps({"prompt": prompt}))
+                async for msg in ws:
+                    data = json.loads(msg)
+                    self._q.put(data)
+                    if data.get("token") is None or "error" in data:
+                        break
+        except Exception as e:
+            self._q.put({"error": str(e)})
 
 
 # --------------------------------------------------------------------------- #
@@ -91,7 +67,7 @@ def apply_guardrails(text, guardrail_model):
     return text, False
 
 
-LLM_MODELS = ["llama-3.2"]          # we only expose the local model now
+LLM_MODELS = ["llama-3.2"]
 GUARDRAIL_MODELS = ["none", "moderate", "strict"]
 
 
@@ -195,7 +171,6 @@ def main():
                 # ---- WebSocket streaming ----
                 if "ws_client" not in st.session_state:
                     st.session_state.ws_client = WsClient(WS_URL)
-                    st.session_state.ws_client.start()
                     time.sleep(0.5)  # give it a moment to connect
 
                 with st.chat_message("assistant"):
