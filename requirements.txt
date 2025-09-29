@@ -1,0 +1,5 @@
+streamlit
+bcrypt
+aiohttp
+ollama
+websocket-client
