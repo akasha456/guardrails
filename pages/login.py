@@ -3,11 +3,14 @@ import json
 import os
 import bcrypt
 import logging
+import requests
+from datetime import datetime
 
 logger = logging.getLogger("ChatApp")
 
-# File to store user credentials
+# Files
 CREDENTIALS_FILE = "users.json"
+LOGIN_LOG_FILE = "login_logs.json"  # New: store login attempts
 
 def load_users():
     if os.path.exists(CREDENTIALS_FILE):
@@ -18,6 +21,58 @@ def load_users():
 def save_users(users):
     with open(CREDENTIALS_FILE, "w") as f:
         json.dump(users, f, indent=4)
+
+import requests
+
+def get_client_ip():
+    """Get client IP: real IP when deployed, public IP of server when on localhost."""
+    try:
+        # Try to get real client IP (works in cloud deployments)
+        ip = st.context.headers.get("X-Forwarded-For")
+        if ip:
+            return ip.split(",")[0].strip()
+    except Exception:
+        pass
+
+    # Fallback 1: Check if Host is localhost
+    try:
+        host = st.context.headers.get("Host", "").split(":")[0]
+        if host in ["localhost", "127.0.0.1", "::1"]:
+            # You're on localhost → get YOUR public IP (for demo only)
+            try:
+                response = requests.get("https://api.ipify.org?format=text", timeout=3)
+                if response.status_code == 200:
+                    return response.text.strip()
+            except:
+                pass
+            return "127.0.0.1"  # final fallback
+    except Exception:
+        pass
+
+    # Fallback 2: return Host IP if not localhost
+    try:
+        return st.context.headers.get("Host", "unknown").split(":")[0]
+    except:
+        return "unknown"
+
+def log_login_attempt(username, success, ip_address):
+    """Log login attempts to a JSON file."""
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "username": username,
+        "ip_address": ip_address,
+        "success": success
+    }
+
+    logs = []
+    if os.path.exists(LOGIN_LOG_FILE):
+        with open(LOGIN_LOG_FILE, "r") as f:
+            logs = json.load(f)
+    
+    logs.append(log_entry)
+    
+    with open(LOGIN_LOG_FILE, "w") as f:
+        json.dump(logs, f, indent=4)
 
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -59,13 +114,16 @@ def main():
         password = st.text_input("Password", type="password", key="login_pass")
         
         if st.button("Login"):
+            ip_address = get_client_ip()
             if authenticate_user(username, password):
                 st.session_state.authenticated = True
                 st.session_state.username = username
                 st.success("Login successful!")
+                log_login_attempt(username, success=True, ip_address=ip_address)
                 st.markdown("Navigate to **Chatbot** page to start chatting.")
             else:
                 st.error("Invalid username or password")
+                log_login_attempt(username, success=False, ip_address=ip_address)
     
     with tab2:
         st.subheader("Create Account")
