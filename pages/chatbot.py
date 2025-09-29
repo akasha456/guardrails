@@ -9,6 +9,7 @@ import logging
 import requests
 
 logger = logging.getLogger("chatbot")
+ui_logger = logging.getLogger("ui_response") 
 WS_URL = "ws://localhost:5000/ws"  # guard-server
 
 
@@ -115,7 +116,7 @@ def render_feedback_ui(idx: int):
         
         # ✅ LOG FEEDBACK TO CHATBOT LOGGER
         ip_address = getattr(st.session_state, 'ip_address', 'unknown')
-        logger.info(
+        ui_logger.info(
             "User %s (%s) rated response #%d: %s (rating=%s)",
             st.session_state.username,
             ip_address,
@@ -138,7 +139,7 @@ def render_feedback_ui(idx: int):
         st.session_state.messages[idx]["feedback"]["comment"] = new_comment
         if new_comment.strip():  # Only log non-empty comments
             ip_address = getattr(st.session_state, 'ip_address', 'unknown')
-            logger.info(
+            ui_logger.info(
                 "User %s (%s) added comment to response #%d: %s",
                 st.session_state.username,
                 ip_address,

@@ -55,12 +55,23 @@ def setup_logging():
         )
         guardrails_handler.setFormatter(formatter)
         guardrails_logger.addHandler(guardrails_handler)
+
+    ui_respomse_logger= logging.getLogger("ui_response")
+    ui_respomse_logger.setLevel(logging.INFO)
+    if not ui_respomse_logger.handlers:
+        ui_response_handler= RotatingFileHandler(
+            os.path.join(log_dir, "ui_response.log"),
+            maxBytes=5*1024*1024,
+            backupCount=2
+        )
+        ui_response_handler.setFormatter(formatter)
+        ui_respomse_logger.addHandler(ui_response_handler)
     
     console_handler= logging.StreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.INFO)
 
-    for logger in [login_loger, chatbot_logger, ollama_logger, guardrails_logger]:
+    for logger in [login_loger, chatbot_logger, ollama_logger, guardrails_logger, ui_respomse_logger]:
         logger.addHandler(console_handler)
 
 def get_login_logger():
@@ -71,4 +82,6 @@ def get_ollama_logger():
     return logging.getLogger("ollama")
 def get_guardrails_logger():
     return logging.getLogger("guardrails")
+def get_ui_response_logger():
+    return logging.getLogger("ui_response")
     
