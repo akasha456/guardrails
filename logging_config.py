@@ -4,31 +4,58 @@ import os
 
 def setup_logging():
     """Configure application-wide logging, avoiding duplicate handlers"""
-    if not os.path.exists("logs"):
-        os.makedirs("logs")
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
-    logger = logging.getLogger("ChatApp")
+    log_format="%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+    formatter = logging.Formatter(log_format) 
 
-    # Only set up once
-    if not logger.handlers:
-        log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    login_loger=logging.getLogger("login")
+    login_loger.setLevel(logging.INFO)
 
-        logger.setLevel(logging.DEBUG)
+    if not login_loger.handlers:
+        login_handler = RotatingFileHandler(
+            os.path.join(log_dir, "login.log"), 
+            maxBytes=5*1024*1024, 
+            backupCount=2
+        )
+        login_handler.setFormatter(formatter)
+        login_loger.addHandler(login_handler)
+    
+    chatbot_logger = logging.getLogger("chatbot")
+    chatbot_logger.setLevel(logging.INFO)
+    if not chatbot_logger.handlers:
+        chatbot_handler = RotatingFileHandler(
+            os.path.join(log_dir, "chatbot.log"), 
+            maxBytes=5*1024*1024, 
+            backupCount=2
+        )
+        chatbot_handler.setFormatter(formatter)
+        chatbot_logger.addHandler(chatbot_handler)
 
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter(log_format))
+    ollama_logger = logging.getLogger("ollama")
+    ollama_logger.setLevel(logging.INFO)
+    if not ollama_logger.handlers:
+        ollama_handler = RotatingFileHandler(
+            os.path.join(log_dir, "ollama.log"), 
+            maxBytes=5*1024*1024, 
+            backupCount=2
+        )
+        ollama_handler.setFormatter(formatter)
+        ollama_logger.addHandler(ollama_handler)
+    
+    console_handler= logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.INFO)
+
+    for logger in [login_loger, chatbot_logger, ollama_logger]:
         logger.addHandler(console_handler)
 
-        # File handler with rotation
-        file_handler = RotatingFileHandler(
-            "logs/app.log", maxBytes=5_000_000, backupCount=5
-        )
-        file_handler.setFormatter(logging.Formatter(log_format))
-        logger.addHandler(file_handler)
-
-        logger.debug("Logging system initialized (first setup).")
-    else:
-        logger.debug("Logging already initialized, skipping re-setup.")
-
-    return logger
+def get_login_logger():
+    return logging.getLogger("login")
+def get_chatbot_logger():
+    return logging.getLogger("chatbot")
+def get_ollama_logger():
+    return logging.getLogger("ollama")
+    

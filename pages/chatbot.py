@@ -6,15 +6,10 @@ import websockets
 import json
 from datetime import datetime
 import logging
+import requests
+logger = logging.getLogger("chatbot")
 
-# --------------------------------------------------------------------------- #
-# Logging (unchanged)
-# --------------------------------------------------------------------------- #
-logger = logging.getLogger("ChatApp")
 
-# --------------------------------------------------------------------------- #
-# FastAPI WebSocket client (tiny, self-contained)
-# --------------------------------------------------------------------------- #
 WS_URL = "ws://localhost:8765/ws"
 
 class WsClient:
@@ -52,9 +47,31 @@ class WsClient:
             self._q.put({"error": str(e)})
 
 
-# --------------------------------------------------------------------------- #
-# Existing guard-rail helpers (unchanged)
-# --------------------------------------------------------------------------- #
+def get_client_ip():
+    """Get client IP: real IP when deployed, public IP of server when on localhost."""
+    try:
+        # Try to get real client IP (works in cloud deployments)
+        ip = st.context.headers.get("X-Forwarded-For")
+        if ip:
+            return ip.split(",")[0].strip()
+    except Exception:
+        pass
+
+    # Fallback 1: Check if Host is localhost
+    try:
+        host = st.context.headers.get("Host", "").split(":")[0]
+        if host in ["localhost", "127.0.0.1", "::1"]:
+            # You're on localhost → get YOUR public IP (for demo only)
+            try:
+                response = requests.get("https://api.ipify.org?format=text", timeout=3)
+                if response.status_code == 200:
+                    return response.text.strip()
+            except:
+                pass
+            return "127.0.0.1"  # final fallback
+    except Exception:
+        pass
+
 def apply_guardrails(text, guardrail_model):
     if guardrail_model == "strict":
         if any(word in text.lower() for word in ["hate", "violence", "illegal"]):
@@ -94,18 +111,19 @@ def display_notifications():
                     st.info(f"{note['timestamp']}: {note['message']}")
 
 
-# --------------------------------------------------------------------------- #
-# Main UI – identical to your original file
-# --------------------------------------------------------------------------- #
 def main():
+
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
         st.session_state.username = ""
+    
 
     if not st.session_state.authenticated:
+        ip_address= get_client_ip()
+        st.session_state.ip_address = ip_address
         st.error("❌ Please login first!")
         st.markdown("Navigate to **Login** page to authenticate.")
-        logger.warning("Unauthenticated access attempt to chat page.")
+        logger.warning("Unauthenticated access attempt to chat page by ip by {ip_address}.")
         return
 
     if 'messages' not in st.session_state:
@@ -115,6 +133,7 @@ def main():
     if 'selected_guardrail' not in st.session_state:
         st.session_state.selected_guardrail = "moderate"
 
+    logger.info(f"User {st.session_state.username} with ip {st.session_state.ip_address} accessed chatbot page.")
     # ---- sidebar ----
     with st.sidebar:
         st.header(f"Welcome, {st.session_state.username}! 👋")
@@ -126,16 +145,16 @@ def main():
         if st.button("Clear Chat"):
             st.session_state.messages = []
             add_notification("Chat cleared", "success")
-            logger.info(f"User {st.session_state.username} cleared chat.")
+            logger.info(f"User {st.session_state.username} wit ip {st.session_state.ip_address} cleared chat.")
             st.rerun()
 
         if st.button("Logout"):
+            logger.info(f"User {st.session_state.username} logged out with ip {st.session_state.ip_address}.")
             st.session_state.authenticated = False
             st.session_state.username = ""
             st.session_state.messages = []
             st.session_state.notifications = []
             st.success("Logged out successfully!")
-            logger.info("User logged out.")
             return
 
         display_notifications()
@@ -156,7 +175,7 @@ def main():
     # ---- input ----
     if prompt := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        logger.info(f"User {st.session_state.username} entered: {prompt}")
+        logger.info(f"User {st.session_state.username} with ip {st.session_state.ip_address} entered: {prompt}")
 
         guarded_input, blocked = apply_guardrails(prompt, st.session_state.selected_guardrail)
         if blocked:
@@ -165,6 +184,7 @@ def main():
                 "content": guarded_input,
                 "metadata": f"🛡️ Blocked by {st.session_state.selected_guardrail} guardrails"
             })
+            logger.warning("Message blocked by guardrails for user {st.session_state.username} with ip {st.session_state.ip_address} entered: {prompt} .")
             add_notification("Message blocked by guardrails", "error")
         else:
             try:
@@ -192,10 +212,11 @@ def main():
                     "metadata": f"🧠 Generated by {st.session_state.selected_llm} (local Ollama)"
                 })
                 add_notification(f"Response generated using {st.session_state.selected_llm}", "success")
-                logger.info("LLM %s responded successfully (%d chars)", st.session_state.selected_llm, len(text))
+                logger.info("LLM %s responded successfully (%d chars) for user %s with ip address %s with response as %s", st.session_state.selected_llm, len(text),
+                            st.session_state.username, st.session_state.ip_address, text )
 
             except Exception as e:
-                error_msg = f"Error generating response: {str(e)}"
+                error_msg = f"Error generating response: {str(e)} for user {st.session_state.username} with ip {st.session_state.ip_address}."
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
                 add_notification("Failed to generate response", "error")
                 logger.error(error_msg, exc_info=True)

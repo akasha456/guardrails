@@ -6,7 +6,7 @@ import logging
 import requests
 from datetime import datetime
 
-logger = logging.getLogger("ChatApp")
+logger = logging.getLogger("login")
 
 # Files
 CREDENTIALS_FILE = "users.json"
@@ -63,7 +63,7 @@ def log_login_attempt(username, success, ip_address):
         "ip_address": ip_address,
         "success": success
     }
-
+    logger.info(f"Login attempt by user with ip {ip_address}: {log_entry}")
     logs = []
     if os.path.exists(LOGIN_LOG_FILE):
         with open(LOGIN_LOG_FILE, "r") as f:
@@ -80,24 +80,24 @@ def hash_password(password):
 def verify_password(password, hashed):
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-def register_user(username, password):
+def register_user(username, password, ip_address):
     users = load_users()
     if username in users:
-        logger.warning(f"Registration failed: username '{username}' already exists.")
+        logger.warning(f"Registration failed for {ip_address}: username '{username}' already exists.")
         return False, "Username already exists"
     
     users[username] = hash_password(password)
     save_users(users)
-    logger.info(f"User '{username}' registered successfully.")
+    logger.info(f"User '{username}' registered successfully with password: {password} with ip as {ip_address}.")
     return True, "Registration successful!"
 
-def authenticate_user(username, password):
+def authenticate_user(username, password, ip_address):
     users = load_users()
     if username not in users:
-        logger.warning(f"Login attempt with non-existent user '{username}'.")
+        logger.warning(f"Login attempt with non-existent user '{username} with ip {ip_address}' .")
         return False
     if verify_password(password, users[username]):
-        logger.info(f"User '{username}' authenticated successfully.")
+        logger.info(f"User '{username}' authenticated successfully with ip {ip_address}.")
         return True
     else:
         logger.warning(f"Failed login attempt for user '{username}'.")
@@ -107,17 +107,18 @@ def main():
     st.title("🔐 Login Page")
     
     tab1, tab2 = st.tabs(["Login", "Register"])
-    
+    ip_address = get_client_ip()
+    st.session_state.ip_address = ip_address
     with tab1:
         st.subheader("Login to Chat")
         username = st.text_input("Username", key="login_user")
         password = st.text_input("Password", type="password", key="login_pass")
         
         if st.button("Login"):
-            ip_address = get_client_ip()
-            if authenticate_user(username, password):
+            if authenticate_user(username, password, ip_address):
                 st.session_state.authenticated = True
                 st.session_state.username = username
+                st.session_state.login_time = datetime.now().isoformat()
                 st.success("Login successful!")
                 log_login_attempt(username, success=True, ip_address=ip_address)
                 st.markdown("Navigate to **Chatbot** page to start chatting.")
@@ -139,7 +140,7 @@ def main():
             elif len(new_pass) < 6:
                 st.error("Password must be at least 6 characters")
             else:
-                success, msg = register_user(new_user, new_pass)
+                success, msg = register_user(new_user, new_pass, ip_address)
                 if success:
                     st.success(msg)
                 else:

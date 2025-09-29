@@ -1,8 +1,13 @@
 import streamlit as st
-from logging_config import setup_logging
+from logging_config import setup_logging, get_login_logger, get_chatbot_logger, get_ollama_logger
 
 # Initialize logging
-logger = setup_logging()
+setup_logging()
+
+# Get loggers
+login_logger = get_login_logger()
+chatbot_logger = get_chatbot_logger()
+ollama_logger = get_ollama_logger()
 
 # Initialize session state for authentication
 if 'authenticated' not in st.session_state:
@@ -14,7 +19,7 @@ st.title("🔐 Welcome to Secure Chat System")
 if st.session_state.authenticated:
     st.success(f"Welcome, {st.session_state.username}!")
     st.markdown("Navigate to **Chatbot** page to start chatting.")
-    logger.info(f"User {st.session_state.username} already authenticated.")
+    login_logger.info(f"User {st.session_state.username} already authenticated.")
 else:
     st.info("Please navigate to **Login** page to authenticate.")
-    logger.debug("Unauthenticated user visited main page.")
+    login_logger.debug("Unauthenticated user visited main page.")

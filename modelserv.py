@@ -5,16 +5,14 @@ FastAPI WebSocket server that exposes Llama-3.2 (Ollama) to remote clients.
 import asyncio
 import logging
 from typing import Dict
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from ollama import AsyncClient  # pip install ollama
-
+from logging_config import setup_logging, get_ollama_logger
 HOST = "0.0.0.0"
 PORT = 8765
 MODEL = "llama3.2"
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [F] %(message)s")
-log = logging.getLogger("fastapi-ws")
+setup_logging()
+log = get_ollama_logger()
 
 app = FastAPI()
 ollama = AsyncClient()
