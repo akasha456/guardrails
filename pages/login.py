@@ -105,9 +105,9 @@ def authenticate_user(username, password, ip_address):
 
 def main():
     st.title("🔐 Login Page")
-    
     tab1, tab2 = st.tabs(["Login", "Register"])
     ip_address = get_client_ip()
+    logger.info(f"Accessed login page with ip {ip_address} by user.")
     st.session_state.ip_address = ip_address
     with tab1:
         st.subheader("Login to Chat")
@@ -125,6 +125,7 @@ def main():
             else:
                 st.error("Invalid username or password")
                 log_login_attempt(username, success=False, ip_address=ip_address)
+                logger.warning(f"Failed login attempt for user '{username}' with ip {ip_address}.")
     
     with tab2:
         st.subheader("Create Account")

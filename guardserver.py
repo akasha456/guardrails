@@ -9,9 +9,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from guardrails import Guard, OnFailAction
 from guardrails.hub import ToxicLanguage, ProfanityFree, GuardrailsPII
 import websockets   # only used as client to model server
+from logging_config import setup_logging, get_guardrails_logger
+setup_logging()
 
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("guardserver")
+guardrails_logger= get_guardrails_logger()
+log=logging.getLogger("guardrails")
 
 # ------------------ FastAPI app ------------------
 app = FastAPI()
@@ -42,6 +44,7 @@ async def guarded_stream(prompt: str, ui_ws: WebSocket) -> str | None:
             data = json.loads(msg)
 
             if "token" in data:
+                log.info("Received token from model-server: %s for prompt %s ", data["token"], prompt[:40])
                 token = data["token"]
                 if token is None:               # EOS sentinel
                     await ui_ws.send_json({"token": None})
@@ -52,15 +55,19 @@ async def guarded_stream(prompt: str, ui_ws: WebSocket) -> str | None:
                 # ----- output guard on incremental text -----
                 try:
                     guard.validate(candidate, on="output")
+                    log.info("Output guard passed for candidate %s", candidate[:40])
                 except Exception as guard_exc:
+                    log.error("Output guard failed: %s for candidate %s", guard_exc, candidate[:40])
                     await ui_ws.send_json({"error": f"Output guard: {guard_exc}"})
                     return None          # abort
 
                 # guard passed → forward token & commit
                 full_text = candidate
+                log.info("Forwarding token to client: %s", token)
                 await ui_ws.send_json({"token": token})
 
             elif "error" in data:
+                log.error("Error from model-server: %s", data["error"])
                 raise RuntimeError(data["error"])
 # ---------- WebSocket endpoint ----------
 # ---------- WebSocket endpoint ----------
@@ -68,14 +75,15 @@ async def guarded_stream(prompt: str, ui_ws: WebSocket) -> str | None:
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     client = ws.client.host
-    log.info("Client %s connected", client)
+    log.info("Client %s connected into guardrails server", client)
     try:
         data = await ws.receive_json()
         prompt = data.get("prompt", "")
-        log.info("Prompt (%d chars) from %s", len(prompt), client)
+        log.info("Prompt (%d chars) from %s as prompt %s", len(prompt), client, prompt[:40])
 
         # 1. input guard
         guard.validate(prompt, on="input")
+        log.info("Input guard passed for client %s with prompt %s", client, prompt[:40])
 
         # 2. guarded streaming (aborts on first output failure)
         await guarded_stream(prompt, ws)     # <-- changed
@@ -83,7 +91,7 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         log.info("Client %s disconnected", client)
     except Exception as exc:
-        log.exception("Guard error")
+        log.exception("Input Guard error for client %s: %s for prompt %s", client, exc, prompt[:40])
         await ws.send_json({"error": str(exc)})
 # ---------- health ----------
 @app.get("/")

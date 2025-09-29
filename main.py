@@ -1,5 +1,5 @@
 import streamlit as st
-from logging_config import setup_logging, get_login_logger, get_chatbot_logger, get_ollama_logger
+from logging_config import setup_logging, get_login_logger, get_chatbot_logger, get_ollama_logger, get_guardrails_logger
 
 # Initialize logging
 setup_logging()
@@ -8,6 +8,7 @@ setup_logging()
 login_logger = get_login_logger()
 chatbot_logger = get_chatbot_logger()
 ollama_logger = get_ollama_logger()
+guardrails_logger= get_guardrails_logger()
 
 # Initialize session state for authentication
 if 'authenticated' not in st.session_state:

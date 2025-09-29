@@ -45,11 +45,22 @@ def setup_logging():
         ollama_handler.setFormatter(formatter)
         ollama_logger.addHandler(ollama_handler)
     
+    guardrails_logger = logging.getLogger("guardrails")
+    guardrails_logger.setLevel(logging.INFO)
+    if not guardrails_logger.handlers:
+        guardrails_handler = RotatingFileHandler(
+            os.path.join(log_dir, "guardrails.log"), 
+            maxBytes=5*1024*1024, 
+            backupCount=2
+        )
+        guardrails_handler.setFormatter(formatter)
+        guardrails_logger.addHandler(guardrails_handler)
+    
     console_handler= logging.StreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.INFO)
 
-    for logger in [login_loger, chatbot_logger, ollama_logger]:
+    for logger in [login_loger, chatbot_logger, ollama_logger, guardrails_logger]:
         logger.addHandler(console_handler)
 
 def get_login_logger():
@@ -58,4 +69,6 @@ def get_chatbot_logger():
     return logging.getLogger("chatbot")
 def get_ollama_logger():
     return logging.getLogger("ollama")
+def get_guardrails_logger():
+    return logging.getLogger("guardrails")
     

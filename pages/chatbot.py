@@ -159,7 +159,7 @@ def main():
         st.markdown("Navigate to **Login** page to authenticate.")
         logger.warning("Unauthenticated access attempt to chat page by IP: %s.", ip_address)
         return
-
+    logger.info(f"User {st.session_state.username} with IP {st.session_state.ip_address} accessed chatbot page.")
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'selected_llm' not in st.session_state:
@@ -270,11 +270,12 @@ def main():
                     st.session_state.messages[idx]["content"] = full_text
                     st.caption(placeholder_msg["metadata"])
                     logger.info(
-                        "LLM %s replied %d chars to user %s (%s)",
+                        "LLM %s replied %d chars to user %s (%s) with response %s",
                         st.session_state.selected_llm,
                         len(full_text),
                         st.session_state.username,
-                        st.session_state.ip_address
+                        st.session_state.ip_address,
+                        st.session_state.messages[idx]["metadata"]
                     )
 
                 # Always show feedback UI
