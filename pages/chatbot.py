@@ -130,7 +130,10 @@ def main():
         st.session_state.selected_guardrail = "moderate"
 
     ip_address = getattr(st.session_state, 'ip_address', 'unknown')
-    logger.info(f"User {st.session_state.username} with IP {ip_address} accessed chatbot page.")
+
+    if "chat_page_loaded" not in st.session_state:
+        logger.info(f"User {st.session_state.username} with IP {ip_address} accessed chatbot page.")
+        st.session_state.chat_page_loaded = True
 
     # ---- sidebar ----
     with st.sidebar:
@@ -152,6 +155,7 @@ def main():
             st.session_state.username = ""
             st.session_state.messages = []
             st.session_state.notifications = []
+            st.session_state.chat_page_loaded = False  # reset for next login
             st.success("Logged out successfully!")
             return
 
@@ -199,7 +203,7 @@ def main():
                 if new_comment != current_comment:
                     st.session_state.messages[idx]["feedback"]["comment"] = new_comment
 
-    # ---- input ----
+
     if prompt := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         ip_address = getattr(st.session_state, 'ip_address', 'unknown')
@@ -259,7 +263,6 @@ def main():
                 add_notification("Failed to generate response", "error")
                 logger.error(error_msg, exc_info=True)
 
-        st.rerun()
 
 
 if __name__ == "__main__":
