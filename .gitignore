@@ -1,2 +1,5 @@
 __pycache__
 logs
+venv
+login_logs.json
+users.json
