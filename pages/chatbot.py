@@ -7,31 +7,45 @@ import json
 from datetime import datetime
 import logging
 import requests
-
+import threading   
 logger = logging.getLogger("chatbot")
 ui_logger = logging.getLogger("ui_response") 
 WS_URL = "ws://localhost:5000/ws"  # guard-server
 
 
 class WsClient:
-    """Thin async→sync bridge for FastAPI WebSocket."""
+    """Thread-safe WebSocket client that streams tokens in real time."""
     def __init__(self, url: str):
         self.url = url
         self._q = queue.Queue()
+        self._active = False
 
     def send_prompt(self, prompt: str):
-        asyncio.run(self._async_send(prompt))
-
-    def stream(self):
-        """Generator that yields tokens (str) OR error dict."""
-        while True:
-            item = self._q.get()
-            if "token" in item:
-                if item["token"] is None:
+        """Start a background thread to handle WebSocket communication."""
+        if self._active:
+            # Clear any leftover items (shouldn't happen in normal flow)
+            while not self._q.empty():
+                try:
+                    self._q.get_nowait()
+                except queue.Empty:
                     break
-                yield item["token"]
-            else:
-                yield item
+
+        self._active = True
+        thread = threading.Thread(target=self._run_websocket, args=(prompt,), daemon=True)
+        thread.start()
+
+    def _run_websocket(self, prompt: str):
+        """Run the async WebSocket client in a dedicated thread."""
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self._async_send(prompt))
+        except Exception as e:
+            self._q.put({"error": str(e)})
+        finally:
+            loop.close()
+            self._q.put({"token": None})  # Ensure stream ends
 
     async def _async_send(self, prompt: str):
         try:
@@ -40,11 +54,34 @@ class WsClient:
                 async for msg in ws:
                     data = json.loads(msg)
                     self._q.put(data)
+                    # Stop early on error or EOS
                     if data.get("token") is None or "error" in data:
                         break
         except Exception as e:
             self._q.put({"error": str(e)})
 
+    def stream(self):
+        """Generator that yields tokens (str) OR error dict in real time."""
+        while True:
+            try:
+                # Use a small timeout to allow Streamlit to refresh
+                item = self._q.get(timeout=10)
+            except queue.Empty:
+                break
+
+            if isinstance(item, dict):
+                if "token" in item:
+                    if item["token"] is None:
+                        break
+                    yield item["token"]
+                else:
+                    yield item
+                    # If it's an error, stop
+                    if "error" in item:
+                        break
+            else:
+                # Should not happen, but safe fallback
+                yield str(item)
 
 def get_client_ip():
     """Get client IP: real IP when deployed, public IP of server when on localhost."""
@@ -215,7 +252,7 @@ def main():
             if message["role"] == "assistant":
                 render_feedback_ui(idx)
 
-    # ---- input handling ----
+  # ---- input handling ----
     if prompt := st.chat_input("Type your message here..."):
         # Display user message immediately
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -243,6 +280,9 @@ def main():
 
             with st.chat_message("assistant"):
                 placeholder = st.empty()
+                thinking = st.empty()
+                thinking.markdown("🤔 *Thinking…*")
+
                 full_text = ""
                 st.session_state.ws_client.send_prompt(prompt)
                 stream_ended_normally = True
@@ -251,11 +291,11 @@ def main():
                     if isinstance(payload, dict):
                         if "error" in payload:
                             error_msg = payload["error"]
-                            error_msg_ui="Validation error ahs been occured. Sorry try your response again"
+                            error_msg_ui = "Validation error has occurred. Sorry, try your response again."
+                            thinking.empty()
+                            placeholder.error(error_msg_ui)
                             st.session_state.messages[idx]["content"] = error_msg_ui
                             st.session_state.messages[idx]["metadata"] = f"🛡️ {error_msg_ui}"
-                            placeholder.markdown(error_msg_ui)
-                            st.caption(f"🛡️ {error_msg_ui}")
                             logger.warning(
                                 "Guardrails blocked user %s (%s): %s",
                                 st.session_state.username,
@@ -265,15 +305,24 @@ def main():
                             stream_ended_normally = False
                             break
                         elif "response" in payload:
-                            # one-shot full answer
-                            full_text = payload["response"]
-                            placeholder.markdown(full_text)
+                            thinking.empty()
+                            response_text = payload["response"]
+                            for ch in response_text:
+                                full_text += ch
+                                placeholder.empty()
+                                placeholder.markdown(full_text + "▌")
+                                time.sleep(0.015)
                             stream_ended_normally = True
                             break
                     else:
-                        # streaming token
-                        full_text += payload
-                        placeholder.markdown(full_text + "▌")
+                        thinking.empty()
+                        for ch in payload:
+                            full_text += ch
+                            placeholder.empty()
+                            placeholder.markdown(full_text + "▌")
+                            time.sleep(0.015)
+
+                # Finalize
                 if stream_ended_normally:
                     placeholder.markdown(full_text)
                     st.session_state.messages[idx]["content"] = full_text
@@ -284,11 +333,10 @@ def main():
                         len(full_text),
                         st.session_state.username,
                         st.session_state.ip_address,
-                        st.session_state.messages[idx]["metadata"]
+                        full_text
                     )
+                # ✅ DO NOT call render_feedback_ui(idx) here — main loop handles it
 
-                # Always show feedback UI
-                render_feedback_ui(idx)
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"
             error_msg = {
@@ -298,11 +346,7 @@ def main():
                 "feedback": {"rating": None, "comment": ""}
             }
             st.session_state.messages.append(error_msg)
-            idx = len(st.session_state.messages) - 1
-            with st.chat_message("assistant"):
-                st.error(error_content)
-                st.caption("❌ Error occurred")
-                render_feedback_ui(idx)
+            # ✅ Let main loop render feedback — no explicit call needed
             add_notification("Failed to generate response", "error")
             logger.error(
                 "Error for user %s (%s): %s",

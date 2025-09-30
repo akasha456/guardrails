@@ -66,13 +66,6 @@ def setup_logging():
         )
         ui_response_handler.setFormatter(formatter)
         ui_respomse_logger.addHandler(ui_response_handler)
-    
-    console_handler= logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    console_handler.setLevel(logging.INFO)
-
-    for logger in [login_loger, chatbot_logger, ollama_logger, guardrails_logger, ui_respomse_logger]:
-        logger.addHandler(console_handler)
 
 def get_login_logger():
     return logging.getLogger("login")

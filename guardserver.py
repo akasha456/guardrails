@@ -1,24 +1,20 @@
-#!/usr/bin/env python3
-"""
-Guard-server – FastAPI WebSocket (port 5000)
-Receives  {"prompt": "..."}  →  guard  →  forward to model-server
-Replies   {"token": "..."}  or  {"error": "..."}
-"""
-import asyncio, json, logging
+import asyncio
+import json
+import logging
+import re
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from guardrails import Guard, OnFailAction
 from guardrails.hub import ToxicLanguage, ProfanityFree, GuardrailsPII
-import websockets   # only used as client to model server
+import websockets  # only used as client to model server
 from logging_config import setup_logging, get_guardrails_logger
+
 setup_logging()
+guardrails_logger = get_guardrails_logger()
+log = logging.getLogger("guardrails")
 
-guardrails_logger= get_guardrails_logger()
-log=logging.getLogger("guardrails")
-
-# ------------------ FastAPI app ------------------
 app = FastAPI()
 
-# ------------------ guardrails ------------------
 guard = (
     Guard()
     .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
@@ -26,52 +22,87 @@ guard = (
     .use(ProfanityFree, on_fail="exception")
 )
 
-MODEL_WS_URL = "ws://localhost:8765/ws"   # model-server
 
-# ---------- helper: stream from model ----------
-# ---------- helper: GUARDED stream ----------
+executor = ThreadPoolExecutor(max_workers=4)
+MODEL_WS_URL = "ws://localhost:8765/ws"
+CHUNK_WORD_COUNT = 6
+
+def _sync_validate_output(text: str):
+    """Synchronous guard validation — runs in thread pool."""
+    guard.validate(text, on="output")
+
+
+async def validate_and_send_chunk(text: str, ui_ws: WebSocket) -> bool:
+    """Validate a text chunk in a thread and send to UI if valid."""
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(executor, _sync_validate_output, text)
+        await ui_ws.send_json({"token": text})
+        return True
+    except Exception as guard_exc:
+        error_msg = f"Output guard: {guard_exc}"
+        log.error("Output guard failed on chunk: %s → %s", text[:50], error_msg)
+        await ui_ws.send_json({"error": error_msg})
+        return False
+    
 async def guarded_stream(prompt: str, ui_ws: WebSocket) -> str | None:
-    """
-    Stream tokens from model-server → validate *incremental* text
-    (output guard).  On first failure send {"error": ...} and abort.
-    Returns the final text or None if aborted.
-    """
     full_text = ""
-    async with websockets.connect(MODEL_WS_URL) as model_ws:
-        await model_ws.send(json.dumps({"prompt": prompt}))
+    raw_buffer = ""  # ← Accumulates EXACT tokens (with spaces, punct, etc.)
+    try:
+        async with websockets.connect(MODEL_WS_URL) as model_ws:
+            await model_ws.send(json.dumps({"prompt": prompt, "stream": True}))
+            log.info("Connected to model server for streaming for client %s", ui_ws.client.host)
 
-        async for msg in model_ws:
-            data = json.loads(msg)
+            async for msg in model_ws:
+                data = json.loads(msg)
+                if "token" in data:
+                    token = data["token"]
+                    if token is None:
+                        # End of stream: flush remaining raw_buffer
+                        if raw_buffer.strip():
+                            if not await validate_and_send_chunk(raw_buffer, ui_ws):
+                                return None
+                        await ui_ws.send_json({"token": None})
+                        return full_text
 
-            if "token" in data:
-                log.info("Received token from model-server: %s for prompt %s ", data["token"], prompt[:40])
-                token = data["token"]
-                if token is None:               # EOS sentinel
-                    await ui_ws.send_json({"token": None})
-                    return full_text
+                    # Append EXACT token to both full_text and raw_buffer
+                    full_text += token
+                    raw_buffer += token
 
-                candidate = full_text + token
+                    # Count words in raw_buffer (ignoring non-word chars)
+                    words = re.findall(r'\b\w+\b', raw_buffer)
+                    word_count = len(words)
 
-                # ----- output guard on incremental text -----
-                try:
-                    guard.validate(candidate, on="output")
-                    log.info("Output guard passed for candidate %s", candidate[:40])
-                except Exception as guard_exc:
-                    log.error("Output guard failed: %s for candidate %s", guard_exc, candidate[:40])
-                    await ui_ws.send_json({"error": f"Output guard: {guard_exc}"})
-                    return None          # abort
+                    if word_count >= CHUNK_WORD_COUNT:
+                        match_iter = re.finditer(r'\b\w+\b', raw_buffer)
+                        end_pos = 0
+                        word_index = 0
+                        for match in match_iter:
+                            word_index += 1
+                            if word_index == CHUNK_WORD_COUNT:
+                                end_pos = match.end()  # End of Nth word
+                                break
 
-                # guard passed → forward token & commit
-                full_text = candidate
-                log.info("Forwarding token to client: %s", token)
-                await ui_ws.send_json({"token": token})
+                        if end_pos > 0:
+                            chunk_to_validate = raw_buffer[:end_pos]
+                            remaining = raw_buffer[end_pos:]
 
-            elif "error" in data:
-                log.error("Error from model-server: %s", data["error"])
-                raise RuntimeError(data["error"])
-# ---------- WebSocket endpoint ----------
-# ---------- WebSocket endpoint ----------
-# ----------  inside your guardrails server  ----------
+                            # Validate and send the EXACT chunk
+                            if not await validate_and_send_chunk(chunk_to_validate, ui_ws):
+                                log.info("Aborting stream due to guard failure on chunk for user %s", ui_ws.client.host)
+                                return None
+                            raw_buffer = remaining
+                        else:
+                            pass
+                elif "error" in data:
+                    log.error("Error from model-server: %s for user %s", data["error"], ui_ws.client.host)
+                    await ui_ws.send_json({"error": f"Model error: {data['error']}"})
+                    return None
+    except Exception as e:
+        log.exception("Exception in guarded_stream for user %s", ui_ws.client.host)
+        await ui_ws.send_json({"error": "Internal error in guard server"})
+        return None
+    return full_text
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
@@ -81,47 +112,40 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         data = await ws.receive_json()
         prompt = data.get("prompt", "")
-        log.info("Prompt (%d chars) from %s as prompt %s", len(prompt), client, prompt[:40])
 
-        # 1. input guard
+        log.info("Prompt (%d chars) from %s as prompt %s", len(prompt), client, prompt[:40])
+        
         guard.validate(prompt, on="input")
         log.info("Input guard passed for client %s with prompt %s", client, prompt[:40])
 
-        # 2. guarded *full* response (no streaming)
-        await guarded_full_response(prompt, ws)          # <-- changed
-
+        await guarded_stream(prompt, ws)
+        log.info("Output and Input Guard processed for client %s with prompt %s", client, prompt[:40])
     except WebSocketDisconnect:
-        log.info("Client %s disconnected", client)
+        log.info("Client %s disconnected from guardrails server", client)
     except Exception as exc:
         log.exception("Guard error for client %s: %s for prompt %s", client, exc, prompt[:40])
         await ws.send_json({"error": str(exc)})
 
-
 async def guarded_full_response(prompt: str, ws: WebSocket) -> None:
     """
-    Ask model-server for the *entire* answer (no streaming),
-    validate it, then ship it in one WebSocket message.
+    Legacy one-shot mode (kept for compatibility).
+    Fetch full response, validate once, send.
     """
-    # 1. fetch complete reply from model-server
     async with websockets.connect(MODEL_WS_URL) as model_ws:
         await model_ws.send(json.dumps({"prompt": prompt, "stream": False}))
         msg = await model_ws.recv()
         data = json.loads(msg)
 
-    if "error" in data:                       # model-server reported failure
+    if "error" in data:
         raise RuntimeError(data["error"])
 
-    answer = data["response"]                 # whole string in one key
-
-    # 2. output guard
+    answer = data["response"]
     guard.validate(answer, on="output")
-
-    # 3. one-shot delivery to UI
     await ws.send_json({"response": answer})
-# ---------- health ----------
 @app.get("/")
 def health():
     return "Guard-server is running"
+
 
 # ---------- run ----------
 if __name__ == "__main__":
