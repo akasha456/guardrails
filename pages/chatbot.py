@@ -241,53 +241,54 @@ def main():
             st.session_state.messages.append(placeholder_msg)
             idx = len(st.session_state.messages) - 1
 
+            
             with st.chat_message("assistant"):
-                placeholder = st.empty()
+                placeholder = st.empty()          # reusable container
+                thinking = st.empty()
+                thinking.markdown("🤔 *thinking…*")
+
                 full_text = ""
                 st.session_state.ws_client.send_prompt(prompt)
-                stream_ended_normally = True
 
                 for payload in st.session_state.ws_client.stream():
                     if isinstance(payload, dict):
                         if "error" in payload:
-                            error_msg = payload["error"]
-                            error_msg_ui="Validation error ahs been occured. Sorry try your response again"
-                            st.session_state.messages[idx]["content"] = error_msg_ui
-                            st.session_state.messages[idx]["metadata"] = f"🛡️ {error_msg_ui}"
-                            placeholder.markdown(error_msg_ui)
-                            st.caption(f"🛡️ {error_msg_ui}")
+                            error_ui = "Validation error has occurred. Sorry, try your response again."
+                            placeholder.error(error_ui)
+                            st.session_state.messages[idx]["content"] = error_ui
+                            st.session_state.messages[idx]["metadata"] = f"🛡️ {payload['error']}"
                             logger.warning(
                                 "Guardrails blocked user %s (%s): %s",
                                 st.session_state.username,
                                 st.session_state.ip_address,
-                                error_msg
+                                payload["error"],
                             )
-                            stream_ended_normally = False
                             break
-                        elif "response" in payload:
-                            # one-shot full answer
-                            full_text = payload["response"]
-                            placeholder.markdown(full_text)
-                            stream_ended_normally = True
+                        elif "response" in payload:          # one-shot
+                            for ch in payload["response"]:
+                                full_text += ch
+                                placeholder.empty()        # ← force redraw
+                                placeholder.markdown(full_text + "▌")
+                                time.sleep(0.015)          # tweak speed here
                             break
-                    else:
-                        # streaming token
-                        full_text += payload
-                        placeholder.markdown(full_text + "▌")
-                if stream_ended_normally:
-                    placeholder.markdown(full_text)
-                    st.session_state.messages[idx]["content"] = full_text
-                    st.caption(placeholder_msg["metadata"])
-                    logger.info(
-                        "LLM %s replied %d chars to user %s (%s) with response %s",
-                        st.session_state.selected_llm,
-                        len(full_text),
-                        st.session_state.username,
-                        st.session_state.ip_address,
-                        st.session_state.messages[idx]["metadata"]
-                    )
+                    else:                                      # streaming token
+                        for ch in payload:
+                            full_text += ch
+                            placeholder.empty()              # ← force redraw
+                            placeholder.markdown(full_text + "▌")
+                            time.sleep(0.015)                # tweak speed here
 
-                # Always show feedback UI
+                thinking.empty()                             # remove spinner
+                placeholder.markdown(full_text)              # final text without cursor
+                st.session_state.messages[idx]["content"] = full_text
+                st.caption(placeholder_msg["metadata"])
+                logger.info(
+                    "LLM %s replied %d chars to user %s (%s)",
+                    st.session_state.selected_llm,
+                    len(full_text),
+                    st.session_state.username,
+                    st.session_state.ip_address,
+                )
                 render_feedback_ui(idx)
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"
