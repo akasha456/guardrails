@@ -71,6 +71,8 @@ async def guarded_stream(prompt: str, ui_ws: WebSocket) -> str | None:
                 raise RuntimeError(data["error"])
 # ---------- WebSocket endpoint ----------
 # ---------- WebSocket endpoint ----------
+# ----------  inside your guardrails server  ----------
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
@@ -85,14 +87,37 @@ async def websocket_endpoint(ws: WebSocket):
         guard.validate(prompt, on="input")
         log.info("Input guard passed for client %s with prompt %s", client, prompt[:40])
 
-        # 2. guarded streaming (aborts on first output failure)
-        await guarded_stream(prompt, ws)     # <-- changed
+        # 2. guarded *full* response (no streaming)
+        await guarded_full_response(prompt, ws)          # <-- changed
 
     except WebSocketDisconnect:
         log.info("Client %s disconnected", client)
     except Exception as exc:
-        log.exception("Input Guard error for client %s: %s for prompt %s", client, exc, prompt[:40])
+        log.exception("Guard error for client %s: %s for prompt %s", client, exc, prompt[:40])
         await ws.send_json({"error": str(exc)})
+
+
+async def guarded_full_response(prompt: str, ws: WebSocket) -> None:
+    """
+    Ask model-server for the *entire* answer (no streaming),
+    validate it, then ship it in one WebSocket message.
+    """
+    # 1. fetch complete reply from model-server
+    async with websockets.connect(MODEL_WS_URL) as model_ws:
+        await model_ws.send(json.dumps({"prompt": prompt, "stream": False}))
+        msg = await model_ws.recv()
+        data = json.loads(msg)
+
+    if "error" in data:                       # model-server reported failure
+        raise RuntimeError(data["error"])
+
+    answer = data["response"]                 # whole string in one key
+
+    # 2. output guard
+    guard.validate(answer, on="output")
+
+    # 3. one-shot delivery to UI
+    await ws.send_json({"response": answer})
 # ---------- health ----------
 @app.get("/")
 def health():

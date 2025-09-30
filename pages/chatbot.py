@@ -247,24 +247,41 @@ def main():
                 st.session_state.ws_client.send_prompt(prompt)
                 stream_ended_normally = True
 
-                for token in st.session_state.ws_client.stream():
-                    if isinstance(token, dict) and "error" in token:
-                        # ✅ Use ONLY the error message from guard-server
-                        error_msg = token["error"]
-                        st.session_state.messages[idx]["content"] = error_msg
-                        st.session_state.messages[idx]["metadata"] = f"🛡️ {error_msg}"
-                        st.markdown(error_msg)
-                        st.caption(f"🛡️ {error_msg}")
-                        logger.warning(
-                            "Guardrails blocked user %s (%s): %s",
-                            st.session_state.username,
-                            st.session_state.ip_address,
-                            error_msg
-                        )
-                        stream_ended_normally = False
-                        break
-                    full_text += token
-                    placeholder.markdown(full_text + "▌")
+                for payload in st.session_state.ws_client.stream():
+                    # payload is either:
+                    #   - string  (streaming token)
+                    #   - dict{"error": ...}
+                    #   - dict{"response": ...}   (one-shot full answer)
+                    if isinstance(payload, dict):
+                        if "error" in payload:
+                            error_msg = payload["error"]
+                            st.session_state.messages[idx]["content"] = error_msg
+                            st.session_state.messages[idx]["metadata"] = f"🛡️ {error_msg}"
+                            placeholder.markdown(error_msg)
+                            st.caption(f"🛡️ {error_msg}")
+                            logger.warning(
+                                "Guardrails blocked user %s (%s): %s",
+                                st.session_state.username,
+                                st.session_state.ip_address,
+                                error_msg
+                            )
+                            stream_ended_normally = False
+                            break
+                        elif "response" in payload:
+                            # one-shot full answer
+                            full_text = payload["response"]
+                            placeholder.markdown(full_text)
+                            stream_ended_normally = True
+                            break
+                    else:
+                        # streaming token
+                        full_text += payload
+                        placeholder.markdown(full_text + "▌")
+
+
+
+
+
 
                 if stream_ended_normally:
                     placeholder.markdown(full_text)
