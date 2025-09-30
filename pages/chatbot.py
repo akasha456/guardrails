@@ -248,17 +248,14 @@ def main():
                 stream_ended_normally = True
 
                 for payload in st.session_state.ws_client.stream():
-                    # payload is either:
-                    #   - string  (streaming token)
-                    #   - dict{"error": ...}
-                    #   - dict{"response": ...}   (one-shot full answer)
                     if isinstance(payload, dict):
                         if "error" in payload:
                             error_msg = payload["error"]
-                            st.session_state.messages[idx]["content"] = error_msg
-                            st.session_state.messages[idx]["metadata"] = f"🛡️ {error_msg}"
-                            placeholder.markdown(error_msg)
-                            st.caption(f"🛡️ {error_msg}")
+                            error_msg_ui="Validation error ahs been occured. Sorry try your response again"
+                            st.session_state.messages[idx]["content"] = error_msg_ui
+                            st.session_state.messages[idx]["metadata"] = f"🛡️ {error_msg_ui}"
+                            placeholder.markdown(error_msg_ui)
+                            st.caption(f"🛡️ {error_msg_ui}")
                             logger.warning(
                                 "Guardrails blocked user %s (%s): %s",
                                 st.session_state.username,
@@ -277,12 +274,6 @@ def main():
                         # streaming token
                         full_text += payload
                         placeholder.markdown(full_text + "▌")
-
-
-
-
-
-
                 if stream_ended_normally:
                     placeholder.markdown(full_text)
                     st.session_state.messages[idx]["content"] = full_text
@@ -298,7 +289,6 @@ def main():
 
                 # Always show feedback UI
                 render_feedback_ui(idx)
-
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"
             error_msg = {
