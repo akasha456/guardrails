@@ -311,7 +311,7 @@ def main():
                                 full_text += ch
                                 placeholder.empty()
                                 placeholder.markdown(full_text + "▌")
-                                time.sleep(0.015)
+                                time.sleep(0.0005)
                             stream_ended_normally = True
                             break
                     else:
@@ -327,6 +327,7 @@ def main():
                     placeholder.markdown(full_text)
                     st.session_state.messages[idx]["content"] = full_text
                     st.caption(placeholder_msg["metadata"])
+                    st.rerun()  
                     logger.info(
                         "LLM %s replied %d chars to user %s (%s) with response %s",
                         st.session_state.selected_llm,
