@@ -43,12 +43,12 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
     time_start=datetime.datetime.now()
     try:
+        all_streams = ""  # Create a list to store all the stream responses
         while True:
             msg = await ws.receive_json()
             prompt = msg.get("prompt", "")
@@ -66,9 +66,8 @@ async def websocket_endpoint(ws: WebSocket):
                         delta = part["message"]["content"]
                         # delta is a string (e.g., "Hello", " world", "!")
                         await manager.send_json(ws, {"token": delta})
-
-                    # End-of-stream marker
-                    await manager.send_json(ws, {"token": None})
+                        log.info("Generated content: %s", delta)
+                        all_streams+=delta  # Append each stream response to the list
                 else:
                     # ---------- ONE-SHOT ----------
                     resp = await ollama.chat(
@@ -78,14 +77,17 @@ async def websocket_endpoint(ws: WebSocket):
                     )
                     answer = resp["message"]["content"]
                     await manager.send_json(ws, {"response": answer})
+                    log.info("Generated content: %s", answer)
                 latency = (datetime.datetime.now() - time_start).total_seconds() * 1000
                 log.info("Prompt processed for client %s with latency %s", ws.client.host, latency)
+                log.info("All generated content: %s for client %s", "\n",(all_streams), ws.client.host)
             except Exception as exc:
                 log.exception("Error while processing prompt for client %s: %s", ws.client.host, exc)
                 await manager.send_json(ws, {"error": str(exc)})
     except WebSocketDisconnect:
         log.warning("Client %s disconnected", ws.client.host)
         manager.disconnect(ws)
+    
 
 
 @app.get("/")

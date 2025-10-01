@@ -1,174 +1,295 @@
 import asyncio
 import json
 import logging
-import re
+import time
+import threading
+import queue
+import websockets as ws_client  # for connecting to model server
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from guardrails import Guard, OnFailAction
-from guardrails.hub import ToxicLanguage, ProfanityFree, GuardrailsPII
-import websockets  # only used as client to model server
-from logging_config import setup_logging, get_guardrails_logger
-from guardrails.hub import DetectPII
-setup_logging()
-guardrails_logger = get_guardrails_logger()
-log = logging.getLogger("guardrails")
+from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
+import nltk
 
-app = FastAPI()
+# ====== SETUP NLTK ======
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    print("📥 Downloading NLTK 'punkt' tokenizer...")
+    nltk.download('punkt', quiet=True)
 
+# ====== LOGGING ======
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(threadName)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    filename="cli.log",
+    filemode="a"
+)
+log = logging.getLogger("pipeline")
+
+# ====== GUARDS ======
 guard_input = (
     Guard()
     .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
-    .use(DetectPII, ["EMAIL_ADDRESS", "PHONE_NUMBER"], "exception")    
+    .use(DetectPII, entities=["EMAIL_ADDRESS", "PHONE_NUMBER"], on_fail="exception")
     .use(ProfanityFree, on_fail="exception")
 )
+
 guard_output = (
     Guard()
     .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
     .use(ProfanityFree, on_fail="exception")
 )
 
-
-executor = ThreadPoolExecutor(max_workers=4)
+# ====== CONFIG ======
 MODEL_WS_URL = "ws://localhost:8765/ws"
-CHUNK_WORD_COUNT = 6
+MAX_BUFFER_CHARS = 200
+MAX_WAIT_SECONDS = 3
 
-def _sync_validate_output(text: str):
-    """Synchronous guard validation — runs in thread pool."""
-    guard_output.validate(text, on="output")
+# Thread pool for validation
+executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="Validator")
 
+# ====== SENTENCE EXTRACTION ======
+def extract_complete_sentences(raw_text: str):
+    if not raw_text.strip():
+        return "", raw_text
+    sentences = nltk.sent_tokenize(raw_text)
+    if len(sentences) <= 1:
+        return "", raw_text
 
-async def validate_and_send_chunk(text: str, ui_ws: WebSocket) -> bool:
-    """Validate a text chunk in a thread and send to UI if valid."""
+    complete_end = 0
+    search_start = 0
+    for sent in sentences[:-1]:
+        stripped = sent.strip()
+        pos = raw_text.find(stripped, search_start)
+        if pos == -1:
+            break
+        end_guess = pos + len(stripped)
+        while end_guess < len(raw_text):
+            if raw_text[end_guess] in '.!?':
+                end_guess += 1
+                break
+            end_guess += 1
+        else:
+            end_guess = len(raw_text)
+        complete_end = end_guess
+        search_start = end_guess
+
+    if complete_end > 0:
+        return raw_text[:complete_end], raw_text[complete_end:]
+    return "", raw_text
+
+# ====== COMPONENTS (will be instantiated per connection) ======
+
+async def assemble_sentences(raw_token_queue, chunk_queue):
+    raw_buffer = ""
+    last_flush = time.time()
+    chunk_seq = 0
+
+    while True:
+        try:
+            token = await asyncio.wait_for(raw_token_queue.get(), timeout=2.0)
+            if token is None:
+                if raw_buffer.strip():
+                    await chunk_queue.put((chunk_seq, raw_buffer, time.time()))
+                    chunk_seq += 1
+                await chunk_queue.put(None)
+                return
+
+            raw_buffer += token
+            now = time.time()
+
+            complete, remaining = extract_complete_sentences(raw_buffer)
+            if complete:
+                await chunk_queue.put((chunk_seq, complete, now))
+                chunk_seq += 1
+                raw_buffer = remaining
+                last_flush = now
+            elif len(raw_buffer) >= MAX_BUFFER_CHARS or (now - last_flush) >= MAX_WAIT_SECONDS:
+                await chunk_queue.put((chunk_seq, raw_buffer, now))
+                chunk_seq += 1
+                raw_buffer = ""
+                last_flush = now
+
+        except asyncio.TimeoutError:
+            if raw_buffer.strip():
+                await chunk_queue.put((chunk_seq, raw_buffer, time.time()))
+                chunk_seq += 1
+                raw_buffer = ""
+            # Continue loop to wait for more tokens or None
+
+async def dispatch_validations(chunk_queue, write_queue):
     loop = asyncio.get_event_loop()
+    pending = set()
+
+    while True:
+        item = await chunk_queue.get()
+        if item is None:
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            write_queue.put(None)
+            break
+
+        seq, text, recv_time = item
+        task = loop.run_in_executor(executor, validate_chunk_sync, seq, text, recv_time, write_queue)
+        pending.add(task)
+        if len(pending) > 4:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+
+def validate_chunk_sync(seq: int, text: str, recv_time: float, write_queue: queue.Queue):
+    thread_name = threading.current_thread().name
+    start = time.time()
+    log.info(f"[VALIDATION START] Seq={seq} | Chunk: {repr(text[:50])}...")
+
     try:
-        await loop.run_in_executor(executor, _sync_validate_output, text)
-        await ui_ws.send_json({"token": text})
+        guard_output.validate(text, on="output")
+        duration = time.time() - start
+        log.info(f"[VALIDATION PASS] Seq={seq} ({duration:.3f}s) by {thread_name}")
+        write_queue.put(("valid", seq, text, recv_time))
         return True
-    except Exception as guard_exc:
-        error_msg = f"Output guard: {guard_exc}"
-        log.error("Output guard failed on chunk: %s → %s", text[:50], error_msg)
-        await ui_ws.send_json({"error": error_msg})
+    except Exception as e:
+        duration = time.time() - start
+        log.error(f"[VALIDATION FAIL] Seq={seq} ({duration:.3f}s) by {thread_name} → {e}")
+        write_queue.put(("fail", seq, text, recv_time))
         return False
 
+def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
+    """Thread-safe writer that sends to WebSocket using the main asyncio loop."""
+    expected_seq = 0
+    pending = {}
 
-# NEW: Sentence boundary regex (handles . ! ? followed by space or end)
-SENTENCE_BOUNDARY = re.compile(r'[.!?]+(?:\s|$)')
+    def safe_send(data):
+        # Schedule coroutine in the main event loop
+        asyncio.run_coroutine_threadsafe(ws.send_json(data), main_loop)
 
-# NEW: Max buffer size (in chars) to prevent indefinite waiting
-MAX_BUFFER_CHARS = 200
-# NEW: Max time to wait for sentence boundary (in seconds)
-MAX_WAIT_SECONDS = 1.5
+    while True:
+        item = write_queue.get()
+        if item is None:
+            safe_send({"token": None})
+            break
 
-async def guarded_stream(prompt: str, ui_ws: WebSocket) -> str | None:
-    full_text = ""
-    raw_buffer = ""  # Accumulates tokens until sentence boundary or timeout
-    last_flush_time = asyncio.get_event_loop().time()
+        status, seq, text, ts = item
+        if status == "fail":
+            log.error("❌ Validation failed → aborting stream")
+            safe_send({"error": "Guard validation failed on output"})
+            # Drain queue
+            while not write_queue.empty():
+                try:
+                    write_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            break
 
+        if seq == expected_seq:
+            safe_send({"token": text})
+            expected_seq += 1
+            while expected_seq in pending:
+                txt, _ = pending.pop(expected_seq)
+                safe_send({"token": txt})
+                expected_seq += 1
+        else:
+            pending[seq] = (text, ts)
+
+        write_queue.task_done()
+
+async def stream_producer(prompt: str, raw_token_queue: asyncio.Queue):
+    log.info("🚀 Connecting to model server...")
     try:
-        async with websockets.connect(MODEL_WS_URL) as model_ws:
+        async with ws_client.connect(MODEL_WS_URL) as model_ws:
             await model_ws.send(json.dumps({"prompt": prompt, "stream": True}))
-            log.info("Connected to model server for streaming for client %s", ui_ws.client.host)
+            log.info("📤 Prompt sent")
 
             async for msg in model_ws:
                 data = json.loads(msg)
                 if "token" in data:
                     token = data["token"]
                     if token is None:
-                        # End of stream: flush remaining buffer
-                        if raw_buffer.strip():
-                            if not await validate_and_send_chunk(raw_buffer, ui_ws):
-                                return None
-                        await ui_ws.send_json({"token": None})
-                        return full_text
-
-                    full_text += token
-                    raw_buffer += token
-
-                    current_time = asyncio.get_event_loop().time()
-
-                    # Check if we have a sentence boundary OR buffer is too big OR waited too long
-                    has_boundary = bool(SENTENCE_BOUNDARY.search(raw_buffer))
-                    buffer_too_big = len(raw_buffer) >= MAX_BUFFER_CHARS
-                    waited_too_long = (current_time - last_flush_time) >= MAX_WAIT_SECONDS
-
-                    if has_boundary or buffer_too_big or waited_too_long:
-                        # Find the last safe sentence boundary
-                        last_boundary = None
-                        for match in SENTENCE_BOUNDARY.finditer(raw_buffer):
-                            last_boundary = match.end()
-
-                        if last_boundary and last_boundary > 0:
-                            # Flush up to last complete sentence
-                            chunk_to_validate = raw_buffer[:last_boundary]
-                            raw_buffer = raw_buffer[last_boundary:]
-                        else:
-                            # No boundary found → flush entire buffer (fallback)
-                            chunk_to_validate = raw_buffer
-                            raw_buffer = ""
-
-                        if chunk_to_validate.strip():
-                            if not await validate_and_send_chunk(chunk_to_validate, ui_ws):
-                                log.info("Aborting stream due to guard failure on chunk for user %s", ui_ws.client.host)
-                                return None
-
-                        last_flush_time = asyncio.get_event_loop().time()
-
+                        await raw_token_queue.put(None)
+                        log.info("🔚 End of stream signal received from model")
+                        return
+                    await raw_token_queue.put(token)
                 elif "error" in data:
-                    log.error("Error from model-server: %s for user %s", data["error"], ui_ws.client.host)
-                    await ui_ws.send_json({"error": f"Model error: {data['error']}"})
-                    return None
-
+                    log.error(f"💥 Model error: {data['error']}")
+                    await raw_token_queue.put(None)  # Signal end on error
+                    return
+            # If the model WS closes without sending None, still signal end
+            await raw_token_queue.put(None)
+            log.info("🔚 Model WebSocket closed — stream ended")
     except Exception as e:
-        log.exception("Exception in guarded_stream for user %s", ui_ws.client.host)
-        await ui_ws.send_json({"error": "Internal error in guard server"})
-        return None
+        log.exception(f"🔥 Stream error: {e}")
+        await raw_token_queue.put(None)  # Always signal end on exception
 
-    return full_text
+# ====== FASTAPI APP ======
+app = FastAPI()
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     client = ws.client.host
-    log.info("Client %s connected into guardrails server", client)
+    log.info("Client %s connected", client)
+
     try:
+        # Receive prompt
         data = await ws.receive_json()
-        prompt = data.get("prompt", "")
+        prompt = data.get("prompt", "").strip()
+        if not prompt:
+            await ws.send_json({"error": "Prompt is required"})
+            return
 
-        log.info("Prompt (%d chars) from %s as prompt %s", len(prompt), client, prompt[:40])
-        
+        log.info(f"📥 Prompt from {client}: {repr(prompt)}")
         guard_input.validate(prompt, on="input")
-        log.info("Input guard passed for client %s with prompt %s", client, prompt[:40])
+        log.info("✅ Input guard passed")
 
-        await guarded_stream(prompt, ws)
-        log.info("Output and Input Guard processed for client %s with prompt %s", client, prompt[:40])
+        # Create per-connection queues
+        raw_token_queue = asyncio.Queue()
+        chunk_queue = asyncio.Queue()
+        write_queue = queue.Queue()
+
+        # Get the main event loop
+        main_loop = asyncio.get_running_loop()
+
+        # Start writer thread
+        writer_thread = threading.Thread(
+            target=websocket_writer,
+            args=(write_queue, ws, main_loop),
+            name="WebSocketWriter",
+            daemon=True
+        )
+        writer_thread.start()
+
+        # Start pipeline tasks
+        assembler_task = asyncio.create_task(assemble_sentences(raw_token_queue, chunk_queue))
+        dispatcher_task = asyncio.create_task(dispatch_validations(chunk_queue, write_queue))
+
+        # Stream from model — this will eventually put None into raw_token_queue
+        await stream_producer(prompt, raw_token_queue)
+
+        # Wait for the entire pipeline to drain
+        await assembler_task      # Puts None into chunk_queue when done
+        await dispatcher_task     # Puts None into write_queue when done
+
+        # Wait for writer to finish (it receives None from dispatcher)
+        writer_thread.join(timeout=5)
+        if writer_thread.is_alive():
+            log.warning("⚠️ Writer thread did not terminate cleanly for client %s", client)
+        else:
+            log.info("✅ Streaming completed and writer terminated for client %s", client)
+
     except WebSocketDisconnect:
-        log.info("Client %s disconnected from guardrails server", client)
+        log.info("Client %s disconnected", client)
     except Exception as exc:
-        log.exception("Guard error for client %s: %s for prompt %s", client, exc, prompt[:40])
-        await ws.send_json({"error": str(exc)})
+        log.exception("Error in WebSocket handler for %s: %s", client, exc)
+        try:
+            await ws.send_json({"error": f"Server error: {str(exc)}"})
+        except:
+            pass
 
-async def guarded_full_response(prompt: str, ws: WebSocket) -> None:
-    """
-    Legacy one-shot mode (kept for compatibility).
-    Fetch full response, validate once, send.
-    """
-    async with websockets.connect(MODEL_WS_URL) as model_ws:
-        await model_ws.send(json.dumps({"prompt": prompt, "stream": False}))
-        msg = await model_ws.recv()
-        data = json.loads(msg)
-
-    if "error" in data:
-        raise RuntimeError(data["error"])
-
-    answer = data["response"]
-    guard_output.validate(answer, on="output")
-    await ws.send_json({"response": answer})
 @app.get("/")
 def health():
-    return "Guard-server is running"
+    return {"status": "Guardrails streaming server is running"}
 
-
-# ---------- run ----------
+# ====== RUN ======
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("guardserver:app", host="0.0.0.0", port=5000, log_level="info")
+    uvicorn.run("temp:app", host="0.0.0.0", port=5000, log_level="info")
