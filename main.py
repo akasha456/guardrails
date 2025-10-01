@@ -10,7 +10,7 @@ chatbot_logger = get_chatbot_logger()
 ollama_logger = get_ollama_logger()
 guardrails_logger= get_guardrails_logger()
 ui_response_logger = get_ui_response_logger()
-
+st.switch_page("pages/login.py")
 # Initialize session state for authentication
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False

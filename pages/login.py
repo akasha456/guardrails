@@ -122,6 +122,7 @@ def main():
                 st.success("Login successful!")
                 log_login_attempt(username, success=True, ip_address=ip_address)
                 st.markdown("Navigate to **Chatbot** page to start chatting.")
+                st.switch_page("pages/chatbot.py") 
             else:
                 st.error("Invalid username or password")
                 log_login_attempt(username, success=False, ip_address=ip_address)
