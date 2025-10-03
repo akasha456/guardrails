@@ -295,3 +295,186 @@ guardrails.errors.ValidationError: Validation failed for field with errors: The 
 2025-10-03 10:41:19 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=31 (0.533s) by Validator_0
 2025-10-03 10:41:22 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=32 | Complete=True | Chunk: 'Overall, AI is a rapidly evolving field that holds'...
 2025-10-03 10:41:23 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=32 (1.511s) by Validator_1
+2025-10-03 10:45:23 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:45:23 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'what is ai'
+2025-10-03 10:45:25 - MainThread - INFO - websocket_endpoint:253 - ✅ Input guard passed
+2025-10-03 10:45:25 - MainThread - INFO - stream_producer:210 - 🚀 Connecting to model server...
+2025-10-03 10:45:25 - MainThread - INFO - stream_producer:214 - 📤 Prompt sent
+2025-10-03 10:45:29 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=0 | Complete=True | Chunk: 'AI, or Artificial Intelligence, refers to the deve'...
+2025-10-03 10:45:30 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=0 (0.986s) by Validator_0
+2025-10-03 10:45:30 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=1 | Complete=True | Chunk: ' Learning: AI systems can learn from data and impr'...
+2025-10-03 10:45:30 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=2 | Complete=True | Chunk: '2.'...
+2025-10-03 10:45:31 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=1 (0.964s) by Validator_0
+2025-10-03 10:45:31 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=2 (0.918s) by Validator_1
+2025-10-03 10:45:32 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=3 | Complete=True | Chunk: ' Problem-solving: AI systems can analyze problems '...
+2025-10-03 10:45:32 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=4 | Complete=True | Chunk: '3.'...
+2025-10-03 10:45:32 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=3 (0.494s) by Validator_0
+2025-10-03 10:45:33 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=4 (1.004s) by Validator_1
+2025-10-03 10:45:33 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=5 | Complete=True | Chunk: ' Reasoning: AI systems can draw conclusions based '...
+2025-10-03 10:45:33 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=6 | Complete=True | Chunk: '4.'...
+2025-10-03 10:45:34 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=6 (0.526s) by Validator_1
+2025-10-03 10:45:34 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=5 (0.878s) by Validator_0
+2025-10-03 10:45:35 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=7 | Complete=True | Chunk: ' Perception: AI systems can interpret and understa'...
+2025-10-03 10:45:36 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=7 (0.514s) by Validator_1
+2025-10-03 10:45:36 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=8 | Complete=True | Chunk: 'There are several types of AI, including:\n\n1.'...
+2025-10-03 10:45:37 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=8 (0.607s) by Validator_0
+2025-10-03 10:45:40 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=9 | Complete=False | Chunk: ' **Narrow or Weak AI**: Designed to perform a spec'...
+2025-10-03 10:45:40 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=9 (0.000s) by Validator_1
+2025-10-03 10:45:42 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=10 | Complete=True | Chunk: ' ability to understand, learn, and apply knowledge'...
+2025-10-03 10:45:43 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=11 | Complete=True | Chunk: '3.'...
+2025-10-03 10:45:43 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=10 (0.990s) by Validator_0
+2025-10-03 10:45:44 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=11 (0.983s) by Validator_1
+2025-10-03 10:45:45 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=12 | Complete=True | Chunk: ' **Superintelligence**: An AI system that signific'...
+2025-10-03 10:45:46 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=12 (0.650s) by Validator_0
+2025-10-03 10:45:46 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=13 | Complete=True | Chunk: 'Some examples of AI applications include:\n\n1.'...
+2025-10-03 10:45:47 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=13 (0.708s) by Validator_1
+2025-10-03 10:45:48 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=14 | Complete=True | Chunk: ' **Virtual assistants**: Siri, Alexa, Google Assis'...
+2025-10-03 10:45:49 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=14 (0.927s) by Validator_0
+2025-10-03 10:45:49 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=15 | Complete=True | Chunk: " **Image recognition**: Facebook's facial recognit"...
+2025-10-03 10:45:50 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=15 (0.854s) by Validator_1
+2025-10-03 10:45:51 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=16 | Complete=True | Chunk: ' **Natural Language Processing (NLP)**: Chatbots, '...
+2025-10-03 10:45:52 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=16 (1.035s) by Validator_0
+2025-10-03 10:45:54 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=17 | Complete=True | Chunk: ' **Predictive analytics**: Medical diagnosis, cred'...
+2025-10-03 10:45:55 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=17 (0.991s) by Validator_1
+2025-10-03 10:45:55 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=18 | Complete=True | Chunk: ' **Improved efficiency**: Automation of tasks and '...
+2025-10-03 10:45:55 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=19 | Complete=True | Chunk: '2.'...
+2025-10-03 10:45:56 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=18 (0.998s) by Validator_0
+2025-10-03 10:45:56 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=19 (0.974s) by Validator_1
+2025-10-03 10:45:56 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=20 | Complete=True | Chunk: ' **Enhanced decision-making**: Data-driven insight'...
+2025-10-03 10:45:57 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=21 | Complete=True | Chunk: '3.'...
+2025-10-03 10:45:57 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=20 (0.540s) by Validator_0
+2025-10-03 10:45:58 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=21 (0.996s) by Validator_1
+2025-10-03 10:45:58 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=22 | Complete=True | Chunk: ' **Increased productivity**: AI-powered tools and '...
+2025-10-03 10:45:58 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=22 (0.706s) by Validator_0
+2025-10-03 10:45:59 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=23 | Complete=True | Chunk: 'However, AI also raises concerns about:\n\n1.'...
+2025-10-03 10:45:59 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=23 (0.506s) by Validator_1
+2025-10-03 10:46:00 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=24 | Complete=True | Chunk: ' **Job displacement**: Potential loss of jobs due '...
+2025-10-03 10:46:00 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=25 | Complete=True | Chunk: '2.'...
+2025-10-03 10:46:01 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=24 (0.973s) by Validator_0
+2025-10-03 10:46:01 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=25 (0.877s) by Validator_1
+2025-10-03 10:46:03 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=26 | Complete=True | Chunk: ' **Bias and fairness**: AI systems can perpetuate '...
+2025-10-03 10:46:03 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=27 | Complete=True | Chunk: '3.'...
+2025-10-03 10:46:03 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=26 (0.492s) by Validator_0
+2025-10-03 10:46:04 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=27 (0.953s) by Validator_1
+2025-10-03 10:46:05 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=28 | Complete=True | Chunk: ' **Cybersecurity risks**: AI systems can be vulner'...
+2025-10-03 10:46:06 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=28 (0.583s) by Validator_0
+2025-10-03 10:46:08 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=29 | Complete=True | Chunk: 'Overall, AI is a rapidly evolving field that holds'...
+2025-10-03 10:46:09 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=29 (1.062s) by Validator_1
+2025-10-03 10:46:24 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:46:24 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'fuck u  bitch'
+2025-10-03 10:46:25 - MainThread - ERROR - websocket_endpoint:285 - Error in WebSocket handler for 127.0.0.1: Validation failed for field with errors: The following sentences in your response were found to be toxic:
+
+- fuck u  bitch
+Traceback (most recent call last):
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/guardserver.py", line 252, in websocket_endpoint
+    guard_input.validate(prompt, on="input")
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 1097, in validate
+    return self.parse(llm_output=llm_output, *args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 973, in parse
+    return trace_guard_execution(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 206, in trace_guard_execution
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 195, in trace_guard_execution
+    result = _execute_fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 799, in _execute
+    return guard_context.run(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/common.py", line 100, in wrapped_func
+    return func(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 778, in __exec
+    return self._exec(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 877, in _exec
+    call = runner(call_log=call_log, prompt_params=prompt_params)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 200, in __call__
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 170, in __call__
+    iteration = self.step(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 104, in trace_step_wrapper
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 96, in trace_step_wrapper
+    response = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 284, in step
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 269, in step
+    validated_output = self.validate(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 465, in validate
+    validated_output, metadata = validator_service.validate(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/__init__.py", line 90, in validate
+    return validator_service.validate(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 460, in validate
+    value, metadata = self.run_validators(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 380, in run_validators
+    value = self.perform_correction(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/validator_service_base.py", line 106, in perform_correction
+    raise ValidationError(
+guardrails.errors.ValidationError: Validation failed for field with errors: The following sentences in your response were found to be toxic:
+
+- fuck u  bitch
+2025-10-03 10:46:33 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:46:33 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'i hate u'
+2025-10-03 10:46:34 - MainThread - ERROR - websocket_endpoint:285 - Error in WebSocket handler for 127.0.0.1: Validation failed for field with errors: The following sentences in your response were found to be toxic:
+
+- i hate u
+Traceback (most recent call last):
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/guardserver.py", line 252, in websocket_endpoint
+    guard_input.validate(prompt, on="input")
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 1097, in validate
+    return self.parse(llm_output=llm_output, *args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 973, in parse
+    return trace_guard_execution(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 206, in trace_guard_execution
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 195, in trace_guard_execution
+    result = _execute_fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 799, in _execute
+    return guard_context.run(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/common.py", line 100, in wrapped_func
+    return func(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 778, in __exec
+    return self._exec(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 877, in _exec
+    call = runner(call_log=call_log, prompt_params=prompt_params)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 200, in __call__
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 170, in __call__
+    iteration = self.step(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 104, in trace_step_wrapper
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 96, in trace_step_wrapper
+    response = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 284, in step
+    raise e
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 269, in step
+    validated_output = self.validate(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 465, in validate
+    validated_output, metadata = validator_service.validate(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/__init__.py", line 90, in validate
+    return validator_service.validate(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 460, in validate
+    value, metadata = self.run_validators(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 380, in run_validators
+    value = self.perform_correction(
+  File "/home/akash.prathap@acsiatech.com/Desktop/project /guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/validator_service_base.py", line 106, in perform_correction
+    raise ValidationError(
+guardrails.errors.ValidationError: Validation failed for field with errors: The following sentences in your response were found to be toxic:
+
+- i hate u

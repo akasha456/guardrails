@@ -10,19 +10,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from guardrails import Guard, OnFailAction
 from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
 import spacy
-
+from logging_config import setup_logging, get_guardrails_logger
 # ====== SETUP SPACY ======
 nlp = spacy.load("en_core_web_sm")
 
 # ====== LOGGING ======
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(threadName)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    filename="cli.log",
-    filemode="a"
-)
-log = logging.getLogger("pipeline")
+setup_logging()
+log = get_guardrails_logger()
+# log = logging.getLogger("guardrails")
 
 # ====== GUARDS ======
 # Full guard for complete sentences (uses sentence-level validation)
