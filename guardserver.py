@@ -10,6 +10,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from guardrails import Guard, OnFailAction
 from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
 import nltk
+import spacy
 
 # ====== SETUP NLTK ======
 try:
@@ -17,6 +18,8 @@ try:
 except LookupError:
     print("📥 Downloading NLTK 'punkt' tokenizer...")
     nltk.download('punkt', quiet=True)
+
+nlp = spacy.load("en_core_web_sm")
 
 # ====== LOGGING ======
 logging.basicConfig(
@@ -51,32 +54,22 @@ MAX_WAIT_SECONDS = 3
 executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="Validator")
 
 # ====== SENTENCE EXTRACTION ======
-def extract_complete_sentences(raw_text: str):
-    if not raw_text.strip():
-        return "", raw_text
-    sentences = nltk.sent_tokenize(raw_text)
+
+def extract_complete_sentences_spacy(raw_text: str):
+    doc = nlp(raw_text)
+    sentences = list(doc.sents)
     if len(sentences) <= 1:
         return "", raw_text
 
+    # Find last sentence that ends with terminal punctuation
     complete_end = 0
-    search_start = 0
-    for sent in sentences[:-1]:
-        stripped = sent.strip()
-        pos = raw_text.find(stripped, search_start)
-        if pos == -1:
-            break
-        end_guess = pos + len(stripped)
-        while end_guess < len(raw_text):
-            if raw_text[end_guess] in '.!?':
-                end_guess += 1
-                break
-            end_guess += 1
+    for sent in sentences:
+        if sent.text.rstrip()[-1] in '.!?':
+            complete_end = sent.end_char
         else:
-            end_guess = len(raw_text)
-        complete_end = end_guess
-        search_start = end_guess
+            break
 
-    if complete_end > 0:
+    if complete_end:
         return raw_text[:complete_end], raw_text[complete_end:]
     return "", raw_text
 
