@@ -1,0 +1,297 @@
+2025-10-03 10:36:25 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:36:25 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'tell me about uk'
+2025-10-03 10:36:27 - MainThread - ERROR - websocket_endpoint:285 - Error in WebSocket handler for 127.0.0.1: Validation failed for field with errors: The following text in your response contains PII:
+tell me about uk
+Traceback (most recent call last):
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/guardserver.py", line 252, in websocket_endpoint
+    guard_input.validate(prompt, on="input")
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 1097, in validate
+    return self.parse(llm_output=llm_output, *args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 973, in parse
+    return trace_guard_execution(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 206, in trace_guard_execution
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 195, in trace_guard_execution
+    result = _execute_fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 799, in _execute
+    return guard_context.run(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/common.py", line 100, in wrapped_func
+    return func(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 778, in __exec
+    return self._exec(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 877, in _exec
+    call = runner(call_log=call_log, prompt_params=prompt_params)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 200, in __call__
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 170, in __call__
+    iteration = self.step(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 104, in trace_step_wrapper
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 96, in trace_step_wrapper
+    response = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 284, in step
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 269, in step
+    validated_output = self.validate(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 465, in validate
+    validated_output, metadata = validator_service.validate(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/__init__.py", line 90, in validate
+    return validator_service.validate(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 460, in validate
+    value, metadata = self.run_validators(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 380, in run_validators
+    value = self.perform_correction(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/validator_service_base.py", line 106, in perform_correction
+    raise ValidationError(
+guardrails.errors.ValidationError: Validation failed for field with errors: The following text in your response contains PII:
+tell me about uk
+2025-10-03 10:36:41 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:36:41 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'tell me about united states'
+2025-10-03 10:36:42 - MainThread - INFO - websocket_endpoint:253 - ✅ Input guard passed
+2025-10-03 10:36:42 - MainThread - INFO - stream_producer:210 - 🚀 Connecting to model server...
+2025-10-03 10:36:42 - MainThread - INFO - stream_producer:214 - 📤 Prompt sent
+2025-10-03 10:36:44 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=0 | Complete=True | Chunk: 'The United States of America (USA) is a federal re'...
+2025-10-03 10:36:45 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=0 (0.477s) by Validator_0
+2025-10-03 10:36:46 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=1 | Complete=True | Chunk: " It is one of the world's most powerful and influe"...
+2025-10-03 10:36:47 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=1 (0.671s) by Validator_0
+2025-10-03 10:36:48 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=2 | Complete=True | Chunk: '**Geography**\n\nThe United States spans across much'...
+2025-10-03 10:36:49 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=2 (0.880s) by Validator_0
+2025-10-03 10:36:50 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=3 | Complete=True | Chunk: ' The country has a diverse geography, with mountai'...
+2025-10-03 10:36:51 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=3 (0.547s) by Validator_0
+2025-10-03 10:36:51 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=4 | Complete=True | Chunk: '**Capital City**: Washington D.C.\n\n'...
+2025-10-03 10:36:51 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=4 (0.450s) by Validator_0
+2025-10-03 10:36:51 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=5 | Complete=True | Chunk: '**Largest Cities**:\n\n1.'...
+2025-10-03 10:36:52 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=5 (0.487s) by Validator_0
+2025-10-03 10:36:52 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=6 | Complete=True | Chunk: ' New York City (population: over 8 million)\n2.'...
+2025-10-03 10:36:53 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=6 (0.505s) by Validator_0
+2025-10-03 10:36:53 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=7 | Complete=True | Chunk: ' Los Angeles (population: over 4 million)\n3.'...
+2025-10-03 10:36:54 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=7 (0.512s) by Validator_0
+2025-10-03 10:36:54 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=8 | Complete=True | Chunk: ' Chicago (population: over 2.'...
+2025-10-03 10:36:54 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=9 | Complete=True | Chunk: '7 million)\n4.'...
+2025-10-03 10:36:54 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=8 (0.529s) by Validator_0
+2025-10-03 10:36:55 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=10 | Complete=True | Chunk: ' Houston (population: over 2.'...
+2025-10-03 10:36:57 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=9 (2.743s) by Validator_1
+2025-10-03 10:36:57 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=11 | Complete=True | Chunk: '3 million)\n5.'...
+2025-10-03 10:36:58 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=11 (0.562s) by Validator_1
+2025-10-03 10:36:58 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=12 | Complete=True | Chunk: ' Phoenix (population: over 1.'...
+2025-10-03 10:36:58 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=10 (2.695s) by Validator_0
+2025-10-03 10:36:58 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=12 (0.591s) by Validator_1
+2025-10-03 10:36:59 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=13 | Complete=True | Chunk: '7 million)\n\n**Climate**: The US has a varied clima'...
+2025-10-03 10:37:00 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=13 (0.552s) by Validator_0
+2025-10-03 10:37:02 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=14 | Complete=True | Chunk: '**Government**\n\nThe United States is a federal rep'...
+2025-10-03 10:37:02 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=14 (0.766s) by Validator_1
+2025-10-03 10:37:03 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=15 | Complete=True | Chunk: ' The federal system divides power between the thre'...
+2025-10-03 10:37:04 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=15 (0.596s) by Validator_0
+2025-10-03 10:37:04 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=16 | Complete=True | Chunk: ' Executive (President and Cabinet)\n2.'...
+2025-10-03 10:37:05 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=16 (0.535s) by Validator_1
+2025-10-03 10:37:05 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=17 | Complete=True | Chunk: ' Legislative (Congress: Senate and House of Repres'...
+2025-10-03 10:37:06 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=17 (0.646s) by Validator_0
+2025-10-03 10:37:09 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=18 | Complete=True | Chunk: ' Judicial (Supreme Court and lower federal courts)'...
+2025-10-03 10:37:10 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=18 (0.524s) by Validator_1
+2025-10-03 10:37:11 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=19 | Complete=True | Chunk: " The country is home to some of the world's most i"...
+2025-10-03 10:37:12 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=19 (0.620s) by Validator_0
+2025-10-03 10:37:13 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=20 | Complete=True | Chunk: '**Culture**\n\nAmerican culture is diverse, reflecti'...
+2025-10-03 10:37:14 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=20 (0.555s) by Validator_1
+2025-10-03 10:37:14 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=21 | Complete=True | Chunk: ' Some notable aspects include:\n\n1.'...
+2025-10-03 10:37:15 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=21 (0.947s) by Validator_0
+2025-10-03 10:37:16 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=22 | Complete=True | Chunk: " Music: jazz, blues, rock 'n' roll, hip-hop\n2."...
+2025-10-03 10:37:16 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=22 (0.556s) by Validator_1
+2025-10-03 10:37:17 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=23 | Complete=True | Chunk: ' Arts: film (Hollywood), theater, visual arts\n3.'...
+2025-10-03 10:37:18 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=23 (0.512s) by Validator_0
+2025-10-03 10:37:19 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=24 | Complete=True | Chunk: ' Cuisine: burgers, pizza, tacos, barbecue\n4.'...
+2025-10-03 10:37:19 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=24 (0.486s) by Validator_1
+2025-10-03 10:37:20 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=25 | Complete=True | Chunk: ' Sports: football (NFL), baseball (MLB), basketbal'...
+2025-10-03 10:37:21 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=25 (0.632s) by Validator_0
+2025-10-03 10:37:24 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=26 | Complete=True | Chunk: ' Literature: Mark Twain, Ernest Hemingway, Stephen'...
+2025-10-03 10:37:24 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=26 (0.531s) by Validator_1
+2025-10-03 10:37:25 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=27 | Complete=True | Chunk: ' Colonial era (1607-1776): European settlement and'...
+2025-10-03 10:37:26 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=27 (0.963s) by Validator_0
+2025-10-03 10:37:27 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=28 | Complete=True | Chunk: ' American Revolution (1775-1783): war for independ'...
+2025-10-03 10:37:28 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=28 (0.616s) by Validator_1
+2025-10-03 10:37:29 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=29 | Complete=True | Chunk: ' Civil War (1861-1865): conflict over slavery and '...
+2025-10-03 10:37:30 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=29 (0.933s) by Validator_0
+2025-10-03 10:37:32 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=30 | Complete=True | Chunk: ' Industrialization ( late 19th-early 20th centurie'...
+2025-10-03 10:37:32 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=30 (0.863s) by Validator_1
+2025-10-03 10:37:35 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=31 | Complete=True | Chunk: ' World Wars (1917-1918, 1941-1945): US involvement'...
+2025-10-03 10:37:35 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=31 (0.534s) by Validator_0
+2025-10-03 10:37:36 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=32 | Complete=True | Chunk: ' Population: approximately 331 million people\n2.'...
+2025-10-03 10:37:36 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=32 (0.721s) by Validator_1
+2025-10-03 10:37:37 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=33 | Complete=True | Chunk: ' Age distribution:\n - Under 18: 20.'...
+2025-10-03 10:37:38 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=33 (0.750s) by Validator_0
+2025-10-03 10:37:38 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=34 | Complete=True | Chunk: '4%\n - 18-64: 62.'...
+2025-10-03 10:37:38 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=34 (0.478s) by Validator_1
+2025-10-03 10:37:39 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=35 | Complete=True | Chunk: '3%\n - 65 and older: 17.'...
+2025-10-03 10:37:39 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=36 | Complete=True | Chunk: '3%\n3.'...
+2025-10-03 10:37:40 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=36 (0.871s) by Validator_1
+2025-10-03 10:37:41 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=37 | Complete=True | Chunk: ' Ethnicity: diverse, with significant populations '...
+2025-10-03 10:37:41 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=35 (1.958s) by Validator_0
+2025-10-03 10:37:41 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=38 | Complete=True | Chunk: '6%), black or African American (13.'...
+2025-10-03 10:37:42 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=37 (1.134s) by Validator_1
+2025-10-03 10:37:42 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=39 | Complete=True | Chunk: '4%), Hispanic or Latino (18.'...
+2025-10-03 10:37:42 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=38 (0.994s) by Validator_0
+2025-10-03 10:37:43 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=40 | Complete=True | Chunk: '1%), Asian (5.'...
+2025-10-03 10:37:43 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=39 (1.042s) by Validator_1
+2025-10-03 10:37:44 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=41 | Complete=True | Chunk: '7%), Native American (0.'...
+2025-10-03 10:37:44 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=40 (1.481s) by Validator_0
+2025-10-03 10:37:45 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=41 (1.257s) by Validator_1
+2025-10-03 10:37:45 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=42 | Complete=True | Chunk: '9%)\n\n**Challenges**\n\nThe US faces several challeng'...
+2025-10-03 10:37:46 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=43 | Complete=True | Chunk: ' Healthcare: unequal access to healthcare and high'...
+2025-10-03 10:37:47 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=42 (2.184s) by Validator_0
+2025-10-03 10:37:47 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=43 (1.252s) by Validator_1
+2025-10-03 10:37:48 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=44 | Complete=True | Chunk: ' Education: uneven funding and quality of educatio'...
+2025-10-03 10:37:48 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=44 (0.617s) by Validator_0
+2025-10-03 10:37:50 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=45 | Complete=True | Chunk: ' Climate change: the impact of global warming on n'...
+2025-10-03 10:37:52 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=45 (1.990s) by Validator_1
+2025-10-03 10:37:52 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=46 | Complete=True | Chunk: ' Social inequality: racial disparities in wealth, '...
+2025-10-03 10:37:52 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=46 (0.496s) by Validator_0
+2025-10-03 10:37:54 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=47 | Complete=True | Chunk: " If you'd like more information or specific detail"...
+2025-10-03 10:37:54 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=47 (0.498s) by Validator_1
+2025-10-03 10:38:15 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:38:15 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'fuck you bloody bitch'
+2025-10-03 10:38:15 - MainThread - ERROR - websocket_endpoint:285 - Error in WebSocket handler for 127.0.0.1: Validation failed for field with errors: The following sentences in your response were found to be toxic:
+
+- fuck you bloody bitch
+Traceback (most recent call last):
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/guardserver.py", line 252, in websocket_endpoint
+    data = await ws.receive_json()
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 1097, in validate
+    return self.parse(llm_output=llm_output, *args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 973, in parse
+    return trace_guard_execution(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 206, in trace_guard_execution
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/guard_tracing.py", line 195, in trace_guard_execution
+    result = _execute_fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 799, in _execute
+    return guard_context.run(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/common.py", line 100, in wrapped_func
+    return func(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 778, in __exec
+    return self._exec(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/guard.py", line 877, in _exec
+    call = runner(call_log=call_log, prompt_params=prompt_params)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 200, in __call__
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 170, in __call__
+    iteration = self.step(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 104, in trace_step_wrapper
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/telemetry/runner_tracing.py", line 96, in trace_step_wrapper
+    response = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 284, in step
+    raise e
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 269, in step
+    validated_output = self.validate(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/hub_telemetry/hub_tracing.py", line 144, in wrapper
+    resp = fn(*args, **kwargs)
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/run/runner.py", line 465, in validate
+    validated_output, metadata = validator_service.validate(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/__init__.py", line 90, in validate
+    return validator_service.validate(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 460, in validate
+    value, metadata = self.run_validators(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/sequential_validator_service.py", line 380, in run_validators
+    value = self.perform_correction(
+  File "/home/akash.anil@acsiatech.com/Desktop/model server/guardrails/venv/lib/python3.10/site-packages/guardrails/validator_service/validator_service_base.py", line 106, in perform_correction
+    raise ValidationError(
+guardrails.errors.ValidationError: Validation failed for field with errors: The following sentences in your response were found to be toxic:
+
+- fuck you bloody bitch
+2025-10-03 10:38:26 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:38:26 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'tell me a toxic sentence'
+2025-10-03 10:38:27 - MainThread - INFO - websocket_endpoint:253 - ✅ Input guard passed
+2025-10-03 10:38:27 - MainThread - INFO - stream_producer:210 - 🚀 Connecting to model server...
+2025-10-03 10:38:27 - MainThread - INFO - stream_producer:214 - 📤 Prompt sent
+2025-10-03 10:38:30 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=0 | Complete=False | Chunk: '"You\'re so useless and unworthy of love or respect'...
+2025-10-03 10:38:30 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=0 (0.000s) by Validator_0
+2025-10-03 10:38:31 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=1 | Complete=True | Chunk: ' rather than be repeated or used in a real-life co'...
+2025-10-03 10:38:31 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=1 (0.479s) by Validator_1
+2025-10-03 10:40:31 - MainThread - INFO - websocket_endpoint:242 - Client 127.0.0.1 connected
+2025-10-03 10:40:31 - MainThread - INFO - websocket_endpoint:251 - 📥 Prompt from 127.0.0.1: 'what is ai'
+2025-10-03 10:40:33 - MainThread - INFO - websocket_endpoint:253 - ✅ Input guard passed
+2025-10-03 10:40:33 - MainThread - INFO - stream_producer:210 - 🚀 Connecting to model server...
+2025-10-03 10:40:33 - MainThread - INFO - stream_producer:214 - 📤 Prompt sent
+2025-10-03 10:40:35 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=0 | Complete=True | Chunk: 'AI, or Artificial Intelligence, refers to the simu'...
+2025-10-03 10:40:35 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=0 (0.451s) by Validator_0
+2025-10-03 10:40:37 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=1 | Complete=True | Chunk: ' The term can also be applied to any machine that '...
+2025-10-03 10:40:38 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=2 | Complete=True | Chunk: 'There are several types of AI, including:\n\n1.'...
+2025-10-03 10:40:38 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=1 (0.892s) by Validator_0
+2025-10-03 10:40:38 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=2 (0.488s) by Validator_1
+2025-10-03 10:40:40 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=3 | Complete=False | Chunk: ' **Narrow or Weak AI**: This type of AI is designe'...
+2025-10-03 10:40:40 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=3 (0.000s) by Validator_0
+2025-10-03 10:40:40 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=4 | Complete=True | Chunk: ' assistants.\n'...
+2025-10-03 10:40:41 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=5 | Complete=True | Chunk: '2.'...
+2025-10-03 10:40:41 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=4 (0.480s) by Validator_1
+2025-10-03 10:40:41 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=5 (0.467s) by Validator_0
+2025-10-03 10:40:44 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=6 | Complete=False | Chunk: ' **General or Strong AI**: This type of AI would p'...
+2025-10-03 10:40:44 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=6 (0.000s) by Validator_1
+2025-10-03 10:40:45 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=7 | Complete=True | Chunk: ' of AI possesses an intellect that surpasses that '...
+2025-10-03 10:40:46 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=7 (0.946s) by Validator_1
+2025-10-03 10:40:46 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=8 | Complete=True | Chunk: 'AI systems can be classified into two main categor'...
+2025-10-03 10:40:47 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=8 (0.909s) by Validator_0
+2025-10-03 10:40:50 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=9 | Complete=True | Chunk: ' **Machine Learning (ML)**: A subset of AI that in'...
+2025-10-03 10:40:50 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=10 | Complete=True | Chunk: '2.'...
+2025-10-03 10:40:51 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=10 (0.508s) by Validator_0
+2025-10-03 10:40:51 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=9 (0.859s) by Validator_1
+2025-10-03 10:40:52 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=11 | Complete=True | Chunk: ' **Deep Learning (DL)**: A type of ML that uses ne'...
+2025-10-03 10:40:53 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=11 (0.911s) by Validator_0
+2025-10-03 10:40:53 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=12 | Complete=True | Chunk: 'The key characteristics of AI include:\n\n1.'...
+2025-10-03 10:40:54 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=12 (0.625s) by Validator_1
+2025-10-03 10:40:55 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=13 | Complete=True | Chunk: ' **Learning**: The ability to improve performance '...
+2025-10-03 10:40:56 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=14 | Complete=True | Chunk: '2.'...
+2025-10-03 10:40:56 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=13 (0.767s) by Validator_0
+2025-10-03 10:40:57 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=14 (0.993s) by Validator_1
+2025-10-03 10:40:58 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=15 | Complete=True | Chunk: ' **Problem-solving**: The ability to identify and '...
+2025-10-03 10:40:58 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=16 | Complete=True | Chunk: '3.'...
+2025-10-03 10:40:58 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=15 (0.507s) by Validator_0
+2025-10-03 10:40:58 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=16 (0.487s) by Validator_1
+2025-10-03 10:41:00 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=17 | Complete=True | Chunk: ' **Knowledge representation**: The ability to stor'...
+2025-10-03 10:41:01 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=17 (0.928s) by Validator_0
+2025-10-03 10:41:02 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=18 | Complete=True | Chunk: 'AI has many potential applications across various '...
+2025-10-03 10:41:02 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=18 (0.491s) by Validator_1
+2025-10-03 10:41:04 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=19 | Complete=True | Chunk: ' **Healthcare**: AI can help diagnose diseases, de'...
+2025-10-03 10:41:04 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=20 | Complete=True | Chunk: '2.'...
+2025-10-03 10:41:04 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=19 (0.537s) by Validator_0
+2025-10-03 10:41:05 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=20 (0.901s) by Validator_1
+2025-10-03 10:41:06 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=21 | Complete=True | Chunk: ' **Finance**: AI can help analyze financial data, '...
+2025-10-03 10:41:06 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=22 | Complete=True | Chunk: '3.'...
+2025-10-03 10:41:07 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=21 (0.556s) by Validator_0
+2025-10-03 10:41:07 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=22 (0.467s) by Validator_1
+2025-10-03 10:41:08 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=23 | Complete=True | Chunk: ' **Transportation**: AI can help improve safety, e'...
+2025-10-03 10:41:08 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=24 | Complete=True | Chunk: '4.'...
+2025-10-03 10:41:09 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=23 (0.580s) by Validator_0
+2025-10-03 10:41:09 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=24 (0.683s) by Validator_1
+2025-10-03 10:41:11 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=25 | Complete=True | Chunk: ' **Customer service**: AI can help provide 24/7 su'...
+2025-10-03 10:41:12 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=25 (0.907s) by Validator_0
+2025-10-03 10:41:12 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=26 | Complete=True | Chunk: 'However, AI also raises several concerns and chall'...
+2025-10-03 10:41:13 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=26 (0.878s) by Validator_1
+2025-10-03 10:41:14 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=27 | Complete=True | Chunk: ' **Job displacement**: The potential for AI to aut'...
+2025-10-03 10:41:15 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=28 | Complete=True | Chunk: '2.'...
+2025-10-03 10:41:15 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=27 (0.945s) by Validator_0
+2025-10-03 10:41:16 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=28 (0.985s) by Validator_1
+2025-10-03 10:41:16 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=29 | Complete=True | Chunk: ' **Bias and fairness**: The risk of AI systems per'...
+2025-10-03 10:41:17 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=30 | Complete=True | Chunk: '3.'...
+2025-10-03 10:41:17 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=29 (0.524s) by Validator_0
+2025-10-03 10:41:17 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=30 (0.581s) by Validator_1
+2025-10-03 10:41:18 - Validator_0 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=31 | Complete=True | Chunk: ' **Security and privacy**: The need to protect sen'...
+2025-10-03 10:41:19 - Validator_0 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=31 (0.533s) by Validator_0
+2025-10-03 10:41:22 - Validator_1 - INFO - validate_chunk_sync:148 - [VALIDATION START] Seq=32 | Complete=True | Chunk: 'Overall, AI is a rapidly evolving field that holds'...
+2025-10-03 10:41:23 - Validator_1 - INFO - validate_chunk_sync:162 - [VALIDATION PASS] Seq=32 (1.511s) by Validator_1
