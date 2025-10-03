@@ -7,12 +7,16 @@ import json
 from datetime import datetime
 import logging
 import requests
-import threading   
+import threading
+
 logger = logging.getLogger("chatbot")
-ui_logger = logging.getLogger("ui_response") 
+ui_logger = logging.getLogger("ui_response")
 WS_URL = "ws://localhost:5000/ws"  # guard-server
 
 
+# ------------------------------------------------------------------
+# WebSocket client (unchanged logic, only doc-string clarified)
+# ------------------------------------------------------------------
 class WsClient:
     """Thread-safe WebSocket client that streams tokens in real time."""
     def __init__(self, url: str):
@@ -23,7 +27,6 @@ class WsClient:
     def send_prompt(self, prompt: str):
         """Start a background thread to handle WebSocket communication."""
         if self._active:
-            # Clear any leftover items (shouldn't happen in normal flow)
             while not self._q.empty():
                 try:
                     self._q.get_nowait()
@@ -35,8 +38,6 @@ class WsClient:
         thread.start()
 
     def _run_websocket(self, prompt: str):
-        """Run the async WebSocket client in a dedicated thread."""
-        # Create a new event loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -45,7 +46,7 @@ class WsClient:
             self._q.put({"error": str(e)})
         finally:
             loop.close()
-            self._q.put({"token": None})  # Ensure stream ends
+            self._q.put({"token": None})  # EOS marker
 
     async def _async_send(self, prompt: str):
         try:
@@ -54,7 +55,6 @@ class WsClient:
                 async for msg in ws:
                     data = json.loads(msg)
                     self._q.put(data)
-                    # Stop early on error or EOS
                     if data.get("token") is None or "error" in data:
                         break
         except Exception as e:
@@ -64,7 +64,6 @@ class WsClient:
         """Generator that yields tokens (str) OR error dict in real time."""
         while True:
             try:
-                # Use a small timeout to allow Streamlit to refresh
                 item = self._q.get(timeout=10)
             except queue.Empty:
                 break
@@ -76,15 +75,16 @@ class WsClient:
                     yield item["token"]
                 else:
                     yield item
-                    # If it's an error, stop
                     if "error" in item:
                         break
             else:
-                # Should not happen, but safe fallback
                 yield str(item)
 
+
+# ------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------
 def get_client_ip():
-    """Get client IP: real IP when deployed, public IP of server when on localhost."""
     try:
         ip = st.context.headers.get("X-Forwarded-For")
         if ip:
@@ -96,7 +96,6 @@ def get_client_ip():
         host = st.context.headers.get("Host", "").split(":")[0]
         if host in ["localhost", "127.0.0.1", "::1"]:
             try:
-                # Fixed: removed extra space in URL
                 response = requests.get("https://api.ipify.org?format=text", timeout=3)
                 if response.status_code == 200:
                     return response.text.strip()
@@ -136,13 +135,11 @@ def display_notifications():
 
 
 def render_feedback_ui(idx: int):
-    """Render thumbs and comment input for assistant message at index `idx`."""
     message = st.session_state.messages[idx]
     if "feedback" not in message:
         message["feedback"] = {"rating": None, "comment": ""}
     feedback = message["feedback"]
 
-    # Thumbs feedback
     rating_key = f"rating_{idx}"
     current_rating = feedback.get("rating")
     new_rating = st.feedback("thumbs", key=rating_key)
@@ -150,20 +147,12 @@ def render_feedback_ui(idx: int):
         st.session_state.messages[idx]["feedback"]["rating"] = new_rating
         emoji = "👍" if new_rating == 1 else "👎" if new_rating == 0 else "–"
         add_notification(f"Response rated: {emoji}", "info")
-        
-        # ✅ LOG FEEDBACK TO CHATBOT LOGGER
         ip_address = getattr(st.session_state, 'ip_address', 'unknown')
         ui_logger.info(
             "User %s (%s) rated response #%d: %s (rating=%s)",
-            st.session_state.username,
-            ip_address,
-            idx,
-            emoji,
-            new_rating
+            st.session_state.username, ip_address, idx, emoji, new_rating
         )
-        st.rerun()
 
-    # Comment input
     comment_key = f"comment_{idx}"
     current_comment = feedback.get("comment", "")
     new_comment = st.text_input(
@@ -174,18 +163,19 @@ def render_feedback_ui(idx: int):
     )
     if new_comment != current_comment:
         st.session_state.messages[idx]["feedback"]["comment"] = new_comment
-        if new_comment.strip():  # Only log non-empty comments
+        if new_comment.strip():
             ip_address = getattr(st.session_state, 'ip_address', 'unknown')
             ui_logger.info(
                 "User %s (%s) added comment to response #%d: %s",
-                st.session_state.username,
-                ip_address,
-                idx,
-                new_comment
+                st.session_state.username, ip_address, idx, new_comment
             )
 
 
+# ------------------------------------------------------------------
+# Main
+# ------------------------------------------------------------------
 def main():
+    # ---------- auth ----------
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
         st.session_state.username = ""
@@ -197,21 +187,23 @@ def main():
         st.markdown("Navigate to **Login** page to authenticate.")
         logger.warning("Unauthenticated access attempt to chat page by IP: %s.", ip_address)
         return
-    logger.info(f"User {st.session_state.username} with IP {st.session_state.ip_address} accessed chatbot page.")
+
+    # ---------- session init ----------
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'selected_llm' not in st.session_state:
         st.session_state.selected_llm = "llama-3.2"
     if 'selected_guardrail' not in st.session_state:
         st.session_state.selected_guardrail = "moderate"
+    if "gen_id" not in st.session_state:
+        st.session_state.gen_id = 0
 
     ip_address = getattr(st.session_state, 'ip_address', 'unknown')
-
     if "chat_page_loaded" not in st.session_state:
         logger.info(f"User {st.session_state.username} with IP {ip_address} accessed chatbot page.")
         st.session_state.chat_page_loaded = True
 
-    # ---- sidebar ----
+    # ---------- sidebar ----------
     with st.sidebar:
         st.header(f"Welcome, {st.session_state.username}! 👋")
         selected_llm = st.selectbox("Select LLM Model", LLM_MODELS,
@@ -227,11 +219,8 @@ def main():
 
         if st.button("Logout"):
             logger.info(f"User {st.session_state.username} logged out with IP {ip_address}.")
-            st.session_state.authenticated = False
-            st.session_state.username = ""
-            st.session_state.messages = []
-            st.session_state.notifications = []
-            st.session_state.chat_page_loaded = False
+            for key in ['authenticated', 'username', 'messages', 'notifications', 'chat_page_loaded']:
+                st.session_state.pop(key, None)
             st.success("Logged out successfully!")
             return
 
@@ -240,121 +229,109 @@ def main():
     st.session_state.selected_llm = selected_llm
     st.session_state.selected_guardrail = selected_guardrail
 
+    # ---------- header ----------
     st.title("🤖 Advanced Chatbot Interface")
     st.caption(f"Using {selected_llm} with {selected_guardrail} guardrails")
 
-    # ---- render all messages with feedback ----
-    for idx, message in enumerate(st.session_state.messages):
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if "metadata" in message:
-                st.caption(message["metadata"])
-            if message["role"] == "assistant":
-                render_feedback_ui(idx)
+    # ---------- message container (prevents full re-render) ----------
+    msg_container = st.container()
+    with msg_container:
+        for idx, message in enumerate(st.session_state.messages):
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+                if "metadata" in message:
+                    st.caption(message["metadata"])
+                if message["role"] == "assistant":
+                    render_feedback_ui(idx)
 
-  # ---- input handling ----
+    # ---------- input ----------
     if prompt := st.chat_input("Type your message here..."):
-        # Display user message immediately
+        # user message
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        with msg_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-        ip_address = getattr(st.session_state, 'ip_address', 'unknown')
         logger.info(f"User {st.session_state.username} with IP {ip_address} entered: {prompt}")
 
-        # ---- WebSocket streaming (guard-server handles guardrails) ----
+        # assistant placeholder
+        placeholder_msg = {
+            "role": "assistant",
+            "content": "",
+            "metadata": f"🧠 Generated by {st.session_state.selected_llm} (guard-server)",
+            "feedback": {"rating": None, "comment": ""}
+        }
+        st.session_state.messages.append(placeholder_msg)
+        idx = len(st.session_state.messages) - 1
+
+        # ---------- streaming ----------
         try:
             if "ws_client" not in st.session_state:
                 st.session_state.ws_client = WsClient(WS_URL)
                 time.sleep(0.5)
 
-            # Prepare placeholder
-            placeholder_msg = {
-                "role": "assistant",
-                "content": "",
-                "metadata": f"🧠 Generated by {st.session_state.selected_llm} (guard-server)",
-                "feedback": {"rating": None, "comment": ""}
-            }
-            st.session_state.messages.append(placeholder_msg)
-            idx = len(st.session_state.messages) - 1
+            st.session_state.gen_id += 1
+            current_gen = st.session_state.gen_id
 
-            with st.chat_message("assistant"):
-                placeholder = st.empty()
-                thinking = st.empty()
-                thinking.markdown("🤔 *Thinking…*")
+            with msg_container:
+                with st.chat_message("assistant"):
+                    placeholder = st.empty()
+                    thinking = st.empty()
+                    thinking.markdown("🤔 *Thinking…*")
 
-                full_text = ""
-                st.session_state.ws_client.send_prompt(prompt)
-                stream_ended_normally = True
+                    full_text = ""
+                    st.session_state.ws_client.send_prompt(prompt)
+                    stream_ok = True
 
-                for payload in st.session_state.ws_client.stream():
-                    if isinstance(payload, dict):
-                        if "error" in payload:
-                            error_msg = payload["error"]
-                            error_msg_ui = "Validation error has occurred. Sorry, try your response again."
-                            thinking.empty()
-                            placeholder.error(error_msg_ui)
-                            st.session_state.messages[idx]["content"] = error_msg_ui
-                            st.session_state.messages[idx]["metadata"] = f"🛡️ {error_msg_ui}"
-                            logger.warning(
-                                "Guardrails blocked user %s (%s): %s",
-                                st.session_state.username,
-                                st.session_state.ip_address,
-                                error_msg
-                            )
-                            stream_ended_normally = False
+                    for payload in st.session_state.ws_client.stream():
+                        if current_gen != st.session_state.gen_id:
                             break
-                        elif "response" in payload:
+
+                        if isinstance(payload, dict):
+                            if "error" in payload:
+                                thinking.empty()
+                                error_ui = "Validation error has occurred. Sorry, try your response again."
+                                placeholder.error(error_ui)
+                                st.session_state.messages[idx]["content"] = error_ui
+                                st.session_state.messages[idx]["metadata"] = f"🛡️ {error_ui}"
+                                logger.warning(
+                                    "Guardrails blocked user %s (%s): %s",
+                                    st.session_state.username, ip_address, payload["error"]
+                                )
+                                stream_ok = False
+                                break
+                            elif "response" in payload:
+                                thinking.empty()
+                                # ---- simulated typing ----
+                                for ch in payload["response"]:
+                                    full_text += ch
+                                    placeholder.markdown(full_text + "▌")
+                                    time.sleep(0.015)   # <-- controls speed
+                                break
+                        else:
                             thinking.empty()
-                            response_text = payload["response"]
-                            for ch in response_text:
+                            # ---- simulated typing ----
+                            for ch in payload:
                                 full_text += ch
-                                placeholder.empty()
                                 placeholder.markdown(full_text + "▌")
-                                time.sleep(0.0005)
-                            stream_ended_normally = True
-                            break
-                    else:
-                        thinking.empty()
-                        for ch in payload:
-                            full_text += ch
-                            placeholder.empty()
-                            placeholder.markdown(full_text + "▌")
-                            time.sleep(0.015)
+                                time.sleep(0.015)       # <-- controls speed
 
-                # Finalize
-                if stream_ended_normally:
-                    placeholder.markdown(full_text)
-                    st.session_state.messages[idx]["content"] = full_text
-                    st.caption(placeholder_msg["metadata"])
-                    st.rerun()  
-                    logger.info(
-                        "LLM %s replied %d chars to user %s (%s) with response %s",
-                        st.session_state.selected_llm,
-                        len(full_text),
-                        st.session_state.username,
-                        st.session_state.ip_address,
-                        full_text
-                    )
-                # ✅ DO NOT call render_feedback_ui(idx) here — main loop handles it
+                    if stream_ok and current_gen == st.session_state.gen_id:
+                        placeholder.markdown(full_text)  # final text without cursor
+                        st.session_state.messages[idx]["content"] = full_text
 
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"
-            error_msg = {
+            st.session_state.messages.append({
                 "role": "assistant",
                 "content": error_content,
                 "metadata": "❌ Error occurred",
                 "feedback": {"rating": None, "comment": ""}
-            }
-            st.session_state.messages.append(error_msg)
-            # ✅ Let main loop render feedback — no explicit call needed
+            })
             add_notification("Failed to generate response", "error")
             logger.error(
                 "Error for user %s (%s): %s",
-                st.session_state.username,
-                st.session_state.ip_address,
-                str(e),
-                exc_info=True
+                st.session_state.username, ip_address, str(e), exc_info=True
             )
 
 
