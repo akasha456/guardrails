@@ -4,36 +4,25 @@ import logging
 import time
 import threading
 import queue
-import websockets as ws_client  # for connecting to model server
+import websockets as ws_client
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from guardrails import Guard, OnFailAction
 from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
 import spacy
 from logging_config import setup_logging, get_guardrails_logger
-# ====== SETUP SPACY ======
+from router_agent import router
+
 nlp = spacy.load("en_core_web_sm")
 
-# ====== LOGGING ======
 setup_logging()
 log = get_guardrails_logger()
-# log = logging.getLogger("guardrails")
 
-# ====== GUARDS ======
-# Full guard for complete sentences (uses sentence-level validation)
 guard_output_complete = (
     Guard()
     .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
     .use(ProfanityFree, on_fail="exception")
 )
-
-# Optional: lighter guard for fragments (no sentence requirement)
-# Uncomment if you want basic safety on fragments
-# guard_output_fragment = (
-#     Guard()
-#     .use(ProfanityFree, on_fail="exception")
-#     # Note: ToxicLanguage without "sentence" mode may behave differently
-# )
 
 guard_input = (
     Guard()
@@ -41,16 +30,13 @@ guard_input = (
     .use(DetectPII, entities=["EMAIL_ADDRESS", "PHONE_NUMBER"], on_fail="exception")
     .use(ProfanityFree, on_fail="exception")
 )
-
-# ====== CONFIG ======
-MODEL_WS_URL = "ws://localhost:8765/ws"
 MAX_BUFFER_CHARS = 200
 MAX_WAIT_SECONDS = 3
 
-# Thread pool for validation
+
 executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="Validator")
 
-# ====== SENTENCE EXTRACTION ======
+
 def extract_complete_sentences_spacy(raw_text: str):
     if not raw_text.strip():
         return "", raw_text
@@ -72,7 +58,6 @@ def extract_complete_sentences_spacy(raw_text: str):
         return raw_text[:complete_end], raw_text[complete_end:]
     return "", raw_text
 
-# ====== COMPONENTS ======
 
 async def assemble_sentences(raw_token_queue, chunk_queue):
     raw_buffer = ""
@@ -93,14 +78,12 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
             raw_buffer += token
             last_token_time = time.time()
 
-            # Try to extract complete sentences
             complete, remaining = extract_complete_sentences_spacy(raw_buffer)
             if complete:
                 await chunk_queue.put((chunk_seq, complete, time.time(), True))
                 chunk_seq += 1
                 raw_buffer = remaining
             else:
-                # No complete sentence yet — check for forced flush
                 now = time.time()
                 should_flush = (
                     (now - last_token_time >= MAX_WAIT_SECONDS) or
@@ -113,7 +96,6 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
                     last_token_time = now
 
         except asyncio.TimeoutError:
-            # Timeout: flush if there's content
             if raw_buffer.strip():
                 await chunk_queue.put((chunk_seq, raw_buffer, time.time(), False))
                 chunk_seq += 1
@@ -147,10 +129,6 @@ def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool
             # Validate with full sentence-level guardrails
             guard_output_complete.validate(text, on="output")
         else:
-            # For fragments: skip sentence-level validation
-            # Optionally, add lightweight checks here (e.g., ProfanityFree only)
-            # Example:
-            # guard_output_fragment.validate(text, on="output")
             pass
 
         duration = time.time() - start
@@ -201,11 +179,12 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
 
         write_queue.task_done()
 
-async def stream_producer(prompt: str, raw_token_queue: asyncio.Queue):
+async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queue):
     log.info("🚀 Connecting to model server...")
     try:
-        async with ws_client.connect(MODEL_WS_URL) as model_ws:
-            await model_ws.send(json.dumps({"prompt": prompt, "stream": True}))
+        log.info(f"🚀 Connecting to model server with url: {url} and payload: {payload}")
+        async with ws_client.connect(url) as model_ws:
+            await model_ws.send(json.dumps(payload))
             log.info("📤 Prompt sent")
 
             async for msg in model_ws:
@@ -230,22 +209,34 @@ async def stream_producer(prompt: str, raw_token_queue: asyncio.Queue):
 # ====== FASTAPI APP ======
 app = FastAPI()
 
-@app.websocket("/ws")
+@app.websocket("/guard")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     client = ws.client.host
-    log.info("Client %s connected", client)
-
+    log.info("Client %s connected into guardserver.", client)
     try:
-        data = await ws.receive_json()
-        prompt = data.get("prompt", "").strip()
+        data= await ws.receive_json()
+        prompt = data.get("prompt", "")
+        username= data.get("username", "")
+        model= data.get("model", "")
+        guard_type= data.get("guard", "")
+        meta={
+            "username": username,
+            "model": model,
+            "guard": guard_type,
+            "prompt": prompt,
+            "ip": client,
+            "timestamp": time.time()
+        }
         if not prompt:
             await ws.send_json({"error": "Prompt is required"})
+            log.error("❌ Prompt is required as username %s with ip %s", username,client)
             return
-
-        log.info(f"📥 Prompt from {client}: {repr(prompt)}")
+        log.info(f"📥 Prompt from {username}({client}): {repr(prompt)} with meta {meta}")
         guard_input.validate(prompt, on="input")
         log.info("✅ Input guard passed")
+        log.info(f"🚀 Sending content to router for client {client} by sending the prompt {prompt} for client with payload: {meta} ")
+        url, model_payload = router(meta)
 
         # Per-connection queues
         raw_token_queue = asyncio.Queue()
@@ -263,8 +254,8 @@ async def websocket_endpoint(ws: WebSocket):
 
         assembler_task = asyncio.create_task(assemble_sentences(raw_token_queue, chunk_queue))
         dispatcher_task = asyncio.create_task(dispatch_validations(chunk_queue, write_queue))
-
-        await stream_producer(prompt, raw_token_queue)
+        log.info(f"🚀 Starting stream for client {client} by sending the prompt {prompt} for client with payload: {model_payload} and url {url} ")
+        await stream_producer(model_payload, url, raw_token_queue)
 
         await assembler_task
         await dispatcher_task
@@ -273,7 +264,6 @@ async def websocket_endpoint(ws: WebSocket):
             log.warning("⚠️ Writer thread did not terminate cleanly for client %s", client)
         else:
             log.info("✅ Streaming completed for client %s", client)
-
     except WebSocketDisconnect:
         log.info("Client %s disconnected", client)
     except Exception as exc:
@@ -284,10 +274,9 @@ async def websocket_endpoint(ws: WebSocket):
             pass
 
 @app.get("/")
-def health():
-    return {"status": "Guardrails streaming server is running"}
-
+async def health():
+    return "WebSocket server is running."
 # ====== RUN ======
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=5000, log_level="info")
+    uvicorn.run("temp:app", host="0.0.0.0", port=5000, log_level="info")

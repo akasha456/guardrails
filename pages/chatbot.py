@@ -11,7 +11,7 @@ import threading
 
 logger = logging.getLogger("chatbot")
 ui_logger = logging.getLogger("ui_response")
-WS_URL = "ws://localhost:5000/ws"  # guard-server
+WS_URL = "ws://localhost:5000/guard"  # guard-server
 
 
 # ------------------------------------------------------------------
@@ -108,7 +108,7 @@ def get_client_ip():
     return "unknown"
 
 
-LLM_MODELS = ["llama-3.2"]
+LLM_MODELS = ["llama-3.2", "claude-2", "gpt-4"]
 GUARDRAIL_MODELS = ["none", "moderate", "strict"]
 
 
@@ -292,6 +292,7 @@ def main():
 
                     full_text = ""
                     st.session_state.ws_client.send_prompt(prompt, meta)
+                    logger.info("Prompt sent to guard-server for user %s (%s): %s", meta["username"], meta["ip"], prompt)
                     stream_ok = True
 
                     for payload in st.session_state.ws_client.stream():
@@ -308,7 +309,7 @@ def main():
                                 st.session_state.messages[idx]["feedback"] = {"rating": None, "comment": ""}
                                 logger.info(
                                     "Assistant reply to user %s (%s) model=%s guard=%s : %s",
-                                    meta["username"], meta["ip"], meta["model"], meta["guard"], full_text[:100]
+                                    meta["username"], meta["ip"], meta["model"], meta["guard"], error_ui
                                 )
                                 st.rerun()  
                                 stream_ok = False
@@ -332,6 +333,10 @@ def main():
                     if stream_ok and current_gen == st.session_state.gen_id:
                         placeholder.markdown(full_text)  # final text without cursor
                         st.session_state.messages[idx]["content"] = full_text
+                        logger.info(
+                            "Assistant reply to user %s (%s) model=%s guard=%s : %s",
+                            meta["username"], meta["ip"], meta["model"], meta["guard"], full_text
+                        )
                         st.rerun()   
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"

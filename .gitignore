@@ -3,3 +3,5 @@ logs
 venv
 login_logs.json
 users.json
+test.py
+temp.py
