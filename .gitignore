@@ -5,3 +5,4 @@ login_logs.json
 users.json
 test.py
 temp.py
+.gitignore
