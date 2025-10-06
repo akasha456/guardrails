@@ -292,12 +292,14 @@ def main():
                                 thinking.empty()
                                 error_ui = "Validation error has occurred. Sorry, try your response again."
                                 placeholder.error(error_ui)
-                                st.session_state.messages[idx]["content"] = error_ui
-                                st.session_state.messages[idx]["metadata"] = f"🛡️ {error_ui}"
+                                st.session_state.messages[idx]["content"]  = error_ui
+                                st.session_state.messages[idx]["metadata"] = f"🛡️ guard-server rejected"
+                                st.session_state.messages[idx]["feedback"] = {"rating": None, "comment": ""}
                                 logger.warning(
                                     "Guardrails blocked user %s (%s): %s",
                                     st.session_state.username, ip_address, payload["error"]
                                 )
+                                st.rerun()  
                                 stream_ok = False
                                 break
                             elif "response" in payload:
@@ -328,11 +330,13 @@ def main():
                 "metadata": "❌ Error occurred",
                 "feedback": {"rating": None, "comment": ""}
             })
+            
             add_notification("Failed to generate response", "error")
             logger.error(
                 "Error for user %s (%s): %s",
                 st.session_state.username, ip_address, str(e), exc_info=True
             )
+            
 
 
 if __name__ == "__main__":
