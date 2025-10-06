@@ -24,34 +24,37 @@ class WsClient:
         self._q = queue.Queue()
         self._active = False
 
-    def send_prompt(self, prompt: str):
-        """Start a background thread to handle WebSocket communication."""
+    # ---------- public entry ----------
+    def send_prompt(self, prompt: str, meta: dict | None = None):
         if self._active:
             while not self._q.empty():
                 try:
                     self._q.get_nowait()
                 except queue.Empty:
                     break
-
         self._active = True
-        thread = threading.Thread(target=self._run_websocket, args=(prompt,), daemon=True)
+        thread = threading.Thread(
+            target=self._run_websocket, args=(prompt, meta or {}), daemon=True
+        )
         thread.start()
 
-    def _run_websocket(self, prompt: str):
+    # ---------- background ----------
+    def _run_websocket(self, prompt: str, meta: dict):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(self._async_send(prompt))
+            loop.run_until_complete(self._async_send(prompt, meta))
         except Exception as e:
             self._q.put({"error": str(e)})
         finally:
             loop.close()
             self._q.put({"token": None})  # EOS marker
 
-    async def _async_send(self, prompt: str):
+    async def _async_send(self, prompt: str, meta: dict):
         try:
             async with websockets.connect(self.url) as ws:
-                await ws.send(json.dumps({"prompt": prompt}))
+                payload = {"prompt": prompt, **meta}  # <-- inject meta
+                await ws.send(json.dumps(payload))
                 async for msg in ws:
                     data = json.loads(msg)
                     self._q.put(data)
@@ -60,14 +63,13 @@ class WsClient:
         except Exception as e:
             self._q.put({"error": str(e)})
 
+    # ---------- consumer ----------
     def stream(self):
-        """Generator that yields tokens (str) OR error dict in real time."""
         while True:
             try:
                 item = self._q.get(timeout=10)
             except queue.Empty:
                 break
-
             if isinstance(item, dict):
                 if "token" in item:
                     if item["token"] is None:
@@ -79,7 +81,6 @@ class WsClient:
                         break
             else:
                 yield str(item)
-
 
 # ------------------------------------------------------------------
 # Helpers
@@ -244,6 +245,7 @@ def main():
                 if message["role"] == "assistant":
                     render_feedback_ui(idx)
 
+
     # ---------- input ----------
     if prompt := st.chat_input("Type your message here..."):
         # user message
@@ -251,8 +253,17 @@ def main():
         with msg_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
-
-        logger.info(f"User {st.session_state.username} with IP {ip_address} entered: {prompt}")
+        
+        meta = {
+            "username": st.session_state.username,
+            "ip": ip_address,
+            "model": st.session_state.selected_llm,
+            "guard": st.session_state.selected_guardrail,
+        }
+        logger.info(
+            "User %s (%s) → model=%s guard=%s prompt=%s",
+            meta["username"], meta["ip"], meta["model"], meta["guard"], prompt
+        )
 
         # assistant placeholder
         placeholder_msg = {
@@ -280,7 +291,7 @@ def main():
                     thinking.markdown("🤔 *Thinking…*")
 
                     full_text = ""
-                    st.session_state.ws_client.send_prompt(prompt)
+                    st.session_state.ws_client.send_prompt(prompt, meta)
                     stream_ok = True
 
                     for payload in st.session_state.ws_client.stream():
@@ -295,9 +306,9 @@ def main():
                                 st.session_state.messages[idx]["content"]  = error_ui
                                 st.session_state.messages[idx]["metadata"] = f"🛡️ guard-server rejected"
                                 st.session_state.messages[idx]["feedback"] = {"rating": None, "comment": ""}
-                                logger.warning(
-                                    "Guardrails blocked user %s (%s): %s",
-                                    st.session_state.username, ip_address, payload["error"]
+                                logger.info(
+                                    "Assistant reply to user %s (%s) model=%s guard=%s : %s",
+                                    meta["username"], meta["ip"], meta["model"], meta["guard"], full_text[:100]
                                 )
                                 st.rerun()  
                                 stream_ok = False
