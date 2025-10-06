@@ -319,7 +319,7 @@ def main():
                     if stream_ok and current_gen == st.session_state.gen_id:
                         placeholder.markdown(full_text)  # final text without cursor
                         st.session_state.messages[idx]["content"] = full_text
-
+                        st.rerun()   
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"
             st.session_state.messages.append({
