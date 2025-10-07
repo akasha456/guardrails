@@ -37,6 +37,7 @@ def send_violation_email(subject: str, body: str, recipient: str = ADMIN_EMAIL):
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
         print(f"📧 Email sent to {recipient}")
+        log.info(f"📧 Email sent to {recipient} for violation with details")
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
 
@@ -279,8 +280,8 @@ async def websocket_endpoint(ws: WebSocket):
             Error: {str(e)}
             Timestamp: {time.ctime()}
             """
-            send_violation_email(subject, body)
             await ws.send_json({"error": "Input validation failed"})
+            send_violation_email(subject, body)
             return
 
         # Start Routing
@@ -327,4 +328,4 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("temp:app", host="0.0.0.0", port=5000, log_level="info")
+    uvicorn.run("guardserver:app", host="0.0.0.0", port=5000, log_level="info")

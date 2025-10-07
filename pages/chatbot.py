@@ -317,7 +317,7 @@ def main():
                     for payload in st.session_state.ws_client.stream():
                         if current_gen != st.session_state.gen_id:
                             break
-
+                        logger.info("Received payload from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                         if isinstance(payload, dict):
                             if "error" in payload:
                                 thinking.empty()
