@@ -130,6 +130,7 @@ def attach_text_file():
         type=["txt", "md", "py", "json", "yaml", "yml", "csv", "log"],
         help="The file’s content will be appended to your prompt."
     )
+    logger.info(f"User '{st.session_state.username}' uploaded a file with ip {st.session_state.ip_address} with file name '{uploaded.name}'.")
     if uploaded is not None:
         string_data = uploaded.read().decode("utf-8", errors="replace")
         return string_data
@@ -199,7 +200,7 @@ def main():
         st.session_state.ip_address = ip_address
         st.error("❌ Please login first!")
         st.markdown("Navigate to **Login** page to authenticate.")
-        logger.warning("Unauthenticated access attempt to chat page by IP: %s.", ip_address)
+        logger.warning("Unauthenticated access attempt to chat page by IP redirecting to login: %s.", ip_address)
         return
 
     # ---------- session init ----------
@@ -230,7 +231,6 @@ def main():
         if st.button("Clear Chat"):
             st.session_state.messages = []
             add_notification("Chat cleared", "success")
-            logger.info(f"User {st.session_state.username} with IP {ip_address} cleared chat.")
             st.rerun()
 
         if st.button("Logout"):
@@ -353,9 +353,8 @@ def main():
                         placeholder.markdown(full_text)  # final text without cursor
                         st.session_state.messages[idx]["content"] = full_text
                         logger.info(
-                            "Assistant reply to user %s (%s) model=%s guard=%s : %s",
-                            meta["username"], meta["ip"], meta["model"], meta["guard"], full_text
-                        )
+                            "Recieved reply to user %s (%s) model=%s guard=%s : %s",
+                            meta["username"], meta["ip"], meta["model"], meta["guard"], len(full_text))
                         st.rerun()   
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"
@@ -365,14 +364,11 @@ def main():
                 "metadata": "❌ Error occurred",
                 "feedback": {"rating": None, "comment": ""}
             })
-            
             add_notification("Failed to generate response", "error")
             logger.error(
                 "Error for user %s (%s): %s",
                 st.session_state.username, ip_address, str(e), exc_info=True
             )
-            
-
-
+        
 if __name__ == "__main__":
     main()

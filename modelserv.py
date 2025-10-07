@@ -76,8 +76,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             latency = (datetime.datetime.now() - time_start).total_seconds() * 1000
 
-            log.info("Prompt processed for client %s with latency %s", ws.client.host, latency)
-            log.info("All generated content: %s for client %s", "\n",(all_streams), ws.client.host)
+            log.info("Prompt processed for client %s by ollama with latency %s", ws.client.host, latency)
         except Exception as exc:
             log.exception("Error while processing prompt for client %s: %s", ws.client.host, exc)
             await manager.send_json(ws, {"error": str(exc)})
@@ -106,15 +105,16 @@ async def websocket_endpoint(ws: WebSocket):
                 await manager.send_json(ws, {"token": char})
                 await asyncio.sleep(0.01)  # Simulate network delay
             await manager.send_json(ws, {"token": None})
+        
         else:
             mock_response = f"[MOCK] Claude-2 response to: {prompt}"
             await manager.send_json(ws, {"response": mock_response})
-
+        log.info("Prompt processed for client by claude for ip %s", ws.client.host)
     except WebSocketDisconnect:
-        log.warning("Client %s disconnected", ws.client.host)
+        log.warning("Client %s disconnected from claude2 endpoint", ws.client.host)
         manager.disconnect(ws)
     except Exception as e:
-        log.exception("Claude mock error: %s", e)
+        log.exception("Claude  error: %s", e)
         await manager.send_json(ws, {"error": "Mock Claude error"})
 
 
@@ -140,12 +140,14 @@ async def websocket_endpoint(ws: WebSocket):
                 await manager.send_json(ws, {"token": char})
                 await asyncio.sleep(0.01)
             await manager.send_json(ws, {"token": None})
+
         else:
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
             await manager.send_json(ws, {"response": mock_response})
-
+        log.info("Prompt processed for client by claude for ip %s", ws.client.host)
     except WebSocketDisconnect:
         manager.disconnect(ws)
+        log.warning("Client %s disconnected from gpt4 endpoint", ws.client.host)
     except Exception as e:
         log.exception("GPT-4 mock error: %s", e)
         await manager.send_json(ws, {"error": "Mock GPT-4 error"})
@@ -175,11 +177,12 @@ async def websocket_endpoint(ws: WebSocket):
         else:
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
             await manager.send_json(ws, {"response": mock_response})
-
+        log.info("Prompt processed for client by vllm for ip %s", ws.client.host)
     except WebSocketDisconnect:
         manager.disconnect(ws)
+        log.warning("Client %s disconnected from vllm endpoint", ws.client.host)
     except Exception as e:
-        log.exception("GPT-4 mock error: %s", e)
+        log.exception("vllm mock error: %s", e)
         await manager.send_json(ws, {"error": "Mock GPT-4 error"})
 @app.get("/")
 async def health():

@@ -155,7 +155,7 @@ def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool
         return True
     except Exception as e:
         duration = time.time() - start
-        log.error(f"[VALIDATION FAIL] Seq={seq} ({duration:.3f}s) by {thread_name} → {e}")
+        log.error(f"[VALIDATION FAIL] Seq={seq} ({duration:.3f}s) by {thread_name} → {str(e)}")
 
         # 🚨 Send Email Alert
         subject = "🚨 Guardrails Output Violation Detected"
@@ -228,7 +228,7 @@ async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queu
                     return
             await raw_token_queue.put(None)
     except Exception as e:
-        log.exception(f"🔥 Stream error: {e}")
+        log.exception(f"🔥 Stream error: {str(e)}")
         await raw_token_queue.put(None)
 
 
@@ -239,7 +239,7 @@ app = FastAPI()
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     client = ws.client.host
-    log.info("Client %s connected.", client)
+    log.info("Client %s connected into guardserver endpoint for generation.", client)
     try:
         data = await ws.receive_json()
         prompt = data.get("prompt", "")
@@ -267,7 +267,7 @@ async def websocket_endpoint(ws: WebSocket):
             guard_input.validate(prompt, on="input")
             log.info("✅ Input guard passed")
         except Exception as e:
-            log.error(f"❌ Input validation failed: {e}")
+            log.error(f"❌ Input validation failed: {str(e)}")
             subject = "🚨 Guardrails Input Violation Detected"
             body = f"""
             Violation detected in INPUT guard:
@@ -313,7 +313,7 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         log.info("Client %s disconnected", client)
     except Exception as exc:
-        log.exception("Error in WebSocket handler for %s: %s", client, exc)
+        log.exception("Error in WebSocket handler for %s: %s", client, str(exc))
         try:
             await ws.send_json({"error": f"Server error: {str(exc)}"})
         except:
