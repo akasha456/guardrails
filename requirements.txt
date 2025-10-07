@@ -3,3 +3,4 @@ bcrypt
 aiohttp
 ollama
 websocket-client
+spacy
