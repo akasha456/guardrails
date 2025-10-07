@@ -130,7 +130,7 @@ def attach_text_file():
         type=["txt", "md", "py", "json", "yaml", "yml", "csv", "log"],
         help="The file’s content will be appended to your prompt."
     )
-    logger.info(f"User '{st.session_state.username}' uploaded a file with ip {st.session_state.ip_address} with file name '{uploaded.name}'.")
+    logger.info(f"User '{st.session_state.username}' uploaded a file with ip {st.session_state.ip_address} with file name '{uploaded}'.")
     if uploaded is not None:
         string_data = uploaded.read().decode("utf-8", errors="replace")
         return string_data
