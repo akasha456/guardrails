@@ -120,7 +120,20 @@ def add_notification(message, notification_type="info"):
         "type": notification_type,
         "timestamp": datetime.now().strftime("%H:%M:%S")
     })
-
+# ------------------------------------------------------------------
+# File attachment helper
+# ------------------------------------------------------------------
+def attach_text_file():
+    """Return the content of the uploaded text file (or None)."""
+    uploaded = st.sidebar.file_uploader(
+        "Attach a text file",
+        type=["txt", "md", "py", "json", "yaml", "yml", "csv", "log"],
+        help="The file’s content will be appended to your prompt."
+    )
+    if uploaded is not None:
+        string_data = uploaded.read().decode("utf-8", errors="replace")
+        return string_data
+    return None
 
 def display_notifications():
     if 'notifications' in st.session_state and st.session_state.notifications:
@@ -211,7 +224,9 @@ def main():
                                     index=LLM_MODELS.index(st.session_state.selected_llm))
         selected_guardrail = st.selectbox("Select Guardrails", GUARDRAIL_MODELS,
                                           index=GUARDRAIL_MODELS.index(st.session_state.selected_guardrail))
-
+        attached_text = attach_text_file()
+        if attached_text:
+            st.sidebar.success("File attached ✅")
         if st.button("Clear Chat"):
             st.session_state.messages = []
             add_notification("Chat cleared", "success")
@@ -247,7 +262,11 @@ def main():
 
 
     # ---------- input ----------
-    if prompt := st.chat_input("Type your message here..."):
+    prompt_box = st.chat_input("Type your message here...")
+    if prompt_box is not None:
+        prompt = prompt_box
+        if attached_text:                       # <-- NEW
+                prompt = f"{prompt}\n\n---\n{attached_text}"  # simple 
         # user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with msg_container:
