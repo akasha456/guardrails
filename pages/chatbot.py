@@ -108,7 +108,7 @@ def get_client_ip():
     return "unknown"
 
 
-LLM_MODELS = ["llama-3.2", "claude-2", "gpt-4"]
+LLM_MODELS = ["llama-3.2", "claude-2", "gpt-4", "VLLM"]
 GUARDRAIL_MODELS = ["none", "moderate", "strict"]
 
 

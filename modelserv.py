@@ -98,11 +98,9 @@ async def websocket_endpoint(ws: WebSocket):
         if stream:
             # Mock streaming response (simulate Claude's style)
             mock_response = (
-                f"Thanks for your message: '{prompt}...'. "
-                "This is a mocked Claude-2 response since no API key is configured. "
-                "In production, this would call Anthropic's API. "
-                "Streaming tokens one by one to match your UI expectations. "
-                "✅ Guardrails validation would run on this output in your main server."
+               f"You asked: '{prompt[:30]}...'.\n\n"
+                "⚠️ This is a **mocked claude2 response** (no  key configured).\n"
+                 "We will be establishing it shortly.\n"
             )
             for char in mock_response:
                 await manager.send_json(ws, {"token": char})
@@ -134,11 +132,41 @@ async def websocket_endpoint(ws: WebSocket):
         if stream:
             # Mock GPT-4 style response
             mock_response = (
+               f"You asked: '{prompt[:30]}...'.\n\n"
+                "⚠️ This is a **mocked gpt4 response** (no key configured).\n"
+                "We will be establishing it shortly.\n"
+            )
+            for char in mock_response:
+                await manager.send_json(ws, {"token": char})
+                await asyncio.sleep(0.01)
+            await manager.send_json(ws, {"token": None})
+        else:
+            mock_response = f"[MOCK] GPT-4 response to: {prompt}"
+            await manager.send_json(ws, {"response": mock_response})
+
+    except WebSocketDisconnect:
+        manager.disconnect(ws)
+    except Exception as e:
+        log.exception("GPT-4 mock error: %s", e)
+        await manager.send_json(ws, {"error": "Mock GPT-4 error"})
+
+
+@app.websocket('/vllm')
+async def websocket_endpoint(ws: WebSocket):
+    await manager.connect(ws)
+    log.info("Client %s connected into vllm endpoint for generation", ws.client.host)
+    try:
+        msg = await ws.receive_json()
+        stream = msg.get("stream", True)
+        messages = msg.get("messages", [])
+        prompt = messages[-1]["content"] if messages else "Hello!"
+
+        if stream:
+            # Mock GPT-4 style response
+            mock_response = (
                 f"You asked: '{prompt[:30]}...'.\n\n"
-                "⚠️ This is a **mocked GPT-4 response** (no OpenAI key configured).\n"
-                "In a real deployment, this would call the OpenAI API.\n"
-                "Tokens are streamed to match your frontend's expected format.\n"
-                "Your guardrails server will validate this output before sending to UI."
+                "⚠️ This is a **mocked VLLM response** (no  key configured).\n"
+                "We will be establishing it shortly.\n"
             )
             for char in mock_response:
                 await manager.send_json(ws, {"token": char})

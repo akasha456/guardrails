@@ -5,7 +5,8 @@ log = get_guardrails_logger()
 MODELS = {
     "llama-3.2": "ws://localhost:8765/llama3.2",
     "claude-2": "ws://localhost:8765/claude2",
-    "gpt-4": "ws://localhost:8765/gpt4"
+    "gpt-4": "ws://localhost:8765/gpt4",
+    "vllm": "ws://localhost:8765/vllm"
 }
 
 
@@ -39,6 +40,15 @@ GPT4_TEMPLATE = {
     "temperature": 0.7
 }
 
+VLLM_TEMPLATE={
+    "model": "NousResearch/Meta-Llama-3-8B-Instruct",
+    "system":"you are an assistant",
+    "messages":[
+        {"role": "user", "content": ""}
+    ],
+    "stream": True
+}
+
 def router(data: dict) -> Tuple[str, Dict[str, Any]]:
     prompt = data.get("prompt", "").strip()
     model_name = data.get("model", "").strip().lower()
@@ -67,6 +77,10 @@ def router(data: dict) -> Tuple[str, Dict[str, Any]]:
 
     elif model_key == "gpt-4":
         payload = GPT4_TEMPLATE.copy()
+        payload["messages"][0]["content"] = prompt
+
+    elif model_key == "vllm":
+        payload = VLLM_TEMPLATE.copy()
         payload["messages"][0]["content"] = prompt
     else:
         log.error("User with username %s sent unknown model %s with ip %s", data.get("username"),model_name,data.get("ip"))
