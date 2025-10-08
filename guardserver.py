@@ -13,11 +13,16 @@ from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
 import spacy
 from logging_config import setup_logging, get_guardrails_logger
 from router_agent import router
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+ADMIN_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
 
 # ---------- Email Configuration (SendGrid) ----------
-ADMIN_EMAIL = "akashanil456@gmail.com"  # Recipient for violation alerts
-SENDGRID_API_KEY = "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"
-SENDGRID_FROM_EMAIL = "akashtrooper010@gmail.com"  # Must be verified in SendGrid
+
 
 # ---------- Email Helper (SendGrid API) ----------
 def send_violation_email(subject: str, body: str, recipient: str = ADMIN_EMAIL):
