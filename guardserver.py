@@ -19,7 +19,7 @@ import os
 load_dotenv()
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-ADMIN_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
+SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
 
 # ---------- Email Configuration (SendGrid) ----------
 
