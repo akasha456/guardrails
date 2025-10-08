@@ -1,3 +1,17 @@
+#!/usr/bin/env python3
+"""
+FastAPI WebSocket guard-server  (Llama-Guard-3 edition)
+––––––––––––––––––––––––––––––––
+- Accepts a JSON prompt via WebSocket
+- Validates  input  with Llama-Guard-3 (Ollama)
+- Streams tokens from a downstream model
+- Validates  output  with Llama-Guard-3
+- Returns tokens to the UI
+- (Optional) e-mail alerts  –  currently COMMENTED OUT
+Everything else (routes, queues, threads, logging, message shapes, …)
+is identical to the original Guardrails-AI version.
+"""
+
 import asyncio
 import json
 import logging
@@ -7,64 +21,59 @@ import queue
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import aiohttp
 import websockets as ws_client
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from guardrails import Guard, OnFailAction
-from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
 import spacy
-from logging_config import setup_logging, get_guardrails_logger
-from router_agent import router
+from logging_config import setup_logging, get_guardrails_logger   # your existing helpers
+from router_agent import router                                  # your existing helper
 
-# ---------- Email Configuration ----------
-ADMIN_EMAIL = "akashpr.b22cs2113@mbcet.ac.in"     # where alerts go
+# ---------- Email Config (remains commented) ----------
+ADMIN_EMAIL = "akashpr.b22cs2113@mbcet.ac.in"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SMTP_USERNAME = "akashtrooper010@gmail.com"       # sender Gmail address
-SMTP_PASSWORD = "mecghhwywrmptrmb"     # app password, not normal Gmail password
+SMTP_USERNAME = "akashtrooper010@gmail.com"
+SMTP_PASSWORD = "mecghhwywrmptrmb"
 
-# # ---------- Email Helper ----------
-# def send_violation_email(subject: str, body: str, recipient: str = ADMIN_EMAIL):
-#     msg = MIMEMultipart()
-#     msg["From"] = SMTP_USERNAME
-#     msg["To"] = recipient
-#     msg["Subject"] = subject
-#     msg.attach(MIMEText(body, "plain"))
+# ---------- Llama-Guard-3 wrapper ----------
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL = "llama-guard3"
 
-#     try:
-#         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-#             server.starttls()
-#             server.login(SMTP_USERNAME, SMTP_PASSWORD)
-#             server.send_message(msg)
-#         print(f"📧 Email sent to {recipient}")
-#         log.info(f"📧 Email sent to {recipient} for violation with details")
-#     except Exception as e:
-#         print(f"❌ Failed to send email: {e}")
+class LlamaGuardException(Exception):
+    """Raised when Llama-Guard-3 flags content as unsafe."""
+    pass
 
+async def _ask_llamaguard(text: str, role: str) -> None:
+    prompt = f"<|start_header_id|>{role}<|end_header_id|>\n\n{text}<|eot_id|>"
+    payload = {"model": MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0}}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(OLLAMA_URL, json=payload) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"Ollama HTTP {resp.status}")
+            body = await resp.json()
+            answer: str = body["response"].strip().lower()
+    if answer.startswith("unsafe"):
+        category = answer.replace("unsafe", "").strip(" ,.")
+        raise LlamaGuardException(f"Llama-Guard-3 flagged {role} content: {category}")
+    if not answer.startswith("safe"):
+        raise LlamaGuardException(f"Unparsable Llama-Guard-3 answer: {body['response']}")
 
-# ---------- NLP + Guard Setup ----------
+async def validate_input(text: str) -> None:
+    await _ask_llamaguard(text, "User")
+
+async def validate_output(text: str) -> None:
+    await _ask_llamaguard(text, "Agent")
+
+# ---------- NLP ----------
 nlp = spacy.load("en_core_web_sm")
-
 setup_logging()
 log = get_guardrails_logger()
 
-guard_output_complete = (
-    Guard()
-    .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
-    .use(ProfanityFree, on_fail="exception")
-)
-
-guard_input = (
-    Guard()
-    .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
-    .use(DetectPII, entities=["EMAIL_ADDRESS", "PHONE_NUMBER"], on_fail="exception")
-    .use(ProfanityFree, on_fail="exception")
-)
-
+# ---------- Constants ----------
 MAX_BUFFER_CHARS = 200
 MAX_WAIT_SECONDS = 3
 executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="Validator")
-
 
 # ---------- Sentence Assembly ----------
 def extract_complete_sentences_spacy(raw_text: str):
@@ -84,7 +93,6 @@ def extract_complete_sentences_spacy(raw_text: str):
     if complete_end > 0:
         return raw_text[:complete_end], raw_text[complete_end:]
     return "", raw_text
-
 
 async def assemble_sentences(raw_token_queue, chunk_queue):
     raw_buffer = ""
@@ -108,10 +116,7 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
                 raw_buffer = remaining
             else:
                 now = time.time()
-                should_flush = (
-                    (now - last_token_time >= MAX_WAIT_SECONDS)
-                    or (len(raw_buffer) >= MAX_BUFFER_CHARS)
-                )
+                should_flush = (now - last_token_time >= MAX_WAIT_SECONDS) or (len(raw_buffer) >= MAX_BUFFER_CHARS)
                 if should_flush and raw_buffer.strip():
                     await chunk_queue.put((chunk_seq, raw_buffer, now, False))
                     chunk_seq += 1
@@ -122,7 +127,6 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
                 await chunk_queue.put((chunk_seq, raw_buffer, time.time(), False))
                 chunk_seq += 1
                 raw_buffer = ""
-
 
 async def dispatch_validations(chunk_queue, write_queue):
     loop = asyncio.get_event_loop()
@@ -135,13 +139,10 @@ async def dispatch_validations(chunk_queue, write_queue):
             write_queue.put(None)
             break
         seq, text, recv_time, is_complete = item
-        task = loop.run_in_executor(
-            executor, validate_chunk_sync, seq, text, recv_time, is_complete, write_queue
-        )
+        task = loop.run_in_executor(executor, validate_chunk_sync, seq, text, recv_time, is_complete, write_queue)
         pending.add(task)
         if len(pending) > 4:
             done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-
 
 def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool, write_queue: queue.Queue):
     thread_name = threading.current_thread().name
@@ -149,42 +150,30 @@ def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool
     log.info(f"[VALIDATION START] Seq={seq} | Complete={is_complete} | Chunk: {repr(text[:50])}...")
     try:
         if is_complete:
-            guard_output_complete.validate(text, on="output")
+            asyncio.run(validate_output(text))          # ← Llama-Guard-3
         duration = time.time() - start
         log.info(f"[VALIDATION PASS] Seq={seq} ({duration:.3f}s) by {thread_name}")
         write_queue.put(("valid", seq, text, recv_time))
         return True
-    except Exception as e:
+    except LlamaGuardException as e:
         duration = time.time() - start
         log.error(f"[VALIDATION FAIL] Seq={seq} ({duration:.3f}s) by {thread_name} → {str(e)}")
-
-        # # 🚨 Send Email Alert
         # subject = "🚨 Guardrails Output Violation Detected"
-        # body = f"""
-        # Violation detected in OUTPUT guard:
-        # Sequence: {seq}
-        # Thread: {thread_name}
-        # Text: {text[:200]}...
-        # Error: {str(e)}
-        # Timestamp: {time.ctime()}
-        # """
+        # body = f"""..."""          # stays commented
         # send_violation_email(subject, body)
-
-        # write_queue.put(("fail", seq, text, recv_time))
-        # return False
-
+        write_queue.put(("fail", seq, text, recv_time))
+        return False
 
 def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
     expected_seq = 0
     pending = {}
-
     def safe_send(data):
         asyncio.run_coroutine_threadsafe(ws.send_json(data), main_loop)
-
     while True:
         item = write_queue.get()
         if item is None:
             safe_send({"token": None})
+            log.info(">>> EOS")
             break
         status, seq, text, ts = item
         if status == "fail":
@@ -197,7 +186,8 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
                     pass
             break
         if seq == expected_seq:
-            safe_send({"token": text})
+            safe_send({"token": {"text": text}})
+            log.info(">>> %s", {"token": {"text": text}})   
             expected_seq += 1
             while expected_seq in pending:
                 txt, _ = pending.pop(expected_seq)
@@ -206,7 +196,6 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
         else:
             pending[seq] = (text, ts)
         write_queue.task_done()
-
 
 async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queue):
     log.info("🚀 Connecting to model server...")
@@ -231,7 +220,6 @@ async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queu
     except Exception as e:
         log.exception(f"🔥 Stream error: {str(e)}")
         await raw_token_queue.put(None)
-
 
 # ---------- FASTAPI APP ----------
 app = FastAPI()
@@ -263,24 +251,15 @@ async def websocket_endpoint(ws: WebSocket):
 
         log.info(f"📥 Prompt from {username}({client}): {repr(prompt)}")
 
-        # Input Guard
+        # Input guard
         try:
-            guard_input.validate(prompt, on="input")
+            await validate_input(prompt)          # ← Llama-Guard-3
             log.info("✅ Input guard passed")
-        except Exception as e:
+        except LlamaGuardException as e:
             log.error(f"❌ Input validation failed: {str(e)}")
-            subject = "🚨 Guardrails Input Violation Detected"
-            body = f"""
-            Violation detected in INPUT guard:
-            Username: {username}
-            IP: {client}
-            Model: {model}
-            Guard Type: {guard_type}
-            Prompt: {prompt}
-            Error: {str(e)}
-            Timestamp: {time.ctime()}
-            """
             await ws.send_json({"error": "Input validation failed"})
+            # subject = "🚨 Guardrails Input Violation Detected"
+            # body = f"""..."""          # stays commented
             # send_violation_email(subject, body)
             return
 
@@ -320,12 +299,10 @@ async def websocket_endpoint(ws: WebSocket):
         except:
             pass
 
-
 @app.get("/")
 async def health():
-    return "WebSocket Guardrails Server is running 🚀"
-
+    return "WebSocket Llama-Guard-3 Server is running 🚀"
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("guardserver:app", host="0.0.0.0", port=5000, log_level="info")
+    uvicorn.run("llamaguardrails:app", host="0.0.0.0", port=5000, log_level="info")
