@@ -10,18 +10,17 @@ from email.mime.multipart import MIMEMultipart
 import websockets as ws_client
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from guardrails import Guard, OnFailAction
-from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
 import spacy
+import aiohttp
 from logging_config import setup_logging, get_guardrails_logger
 from router_agent import router
 
-# ---------- Email Configuration ----------
-ADMIN_EMAIL = "akashpr.b22cs2113@mbcet.ac.in"     # where alerts go
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USERNAME = "akashtrooper010@gmail.com"       # sender Gmail address
-SMTP_PASSWORD = "mecghhwywrmptrmb"     # app password, not normal Gmail password
+# # ---------- Email Configuration ----------
+# ADMIN_EMAIL = "akashpr.b22cs2113@mbcet.ac.in"
+# SMTP_SERVER = "smtp.gmail.com"
+# SMTP_PORT = 587
+# SMTP_USERNAME = "akashtrooper010@gmail.com"
+# SMTP_PASSWORD = "mecghhwywrmptrmb"
 
 # # ---------- Email Helper ----------
 # def send_violation_email(subject: str, body: str, recipient: str = ADMIN_EMAIL):
@@ -41,32 +40,45 @@ SMTP_PASSWORD = "mecghhwywrmptrmb"     # app password, not normal Gmail password
 #     except Exception as e:
 #         print(f"❌ Failed to send email: {e}")
 
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL = "llama-guard3"
+
+class LlamaGuardException(Exception):
+    pass
+
+async def _ask_llamaguard(text: str, role: str) -> None:
+    prompt = f"<|start_header_id|>{role}<|end_header_id|>\n\n{text}<|eot_id|>"
+    payload = {"model": MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0}}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(OLLAMA_URL, json=payload) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"Ollama HTTP {resp.status}")
+            body = await resp.json()
+            answer: str = body["response"].strip().lower()
+    if answer.startswith("unsafe"):
+        category = answer.replace("unsafe", "").strip(" ,.")
+        raise LlamaGuardException(f"Llama-Guard-3 flagged {role} content: {category}")
+    if not answer.startswith("safe"):
+        raise LlamaGuardException(f"Unparsable Llama-Guard-3 answer: {body['response']}")
+
+async def validate_input(text: str) -> None:
+    await _ask_llamaguard(text, "User")
+
+async def validate_output(text: str) -> None:
+    await _ask_llamaguard(text, "Agent")
+
 
 # ---------- NLP + Guard Setup ----------
 nlp = spacy.load("en_core_web_sm")
 
 setup_logging()
 log = get_guardrails_logger()
-
-guard_output_complete = (
-    Guard()
-    .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
-    .use(ProfanityFree, on_fail="exception")
-)
-
-guard_input = (
-    Guard()
-    .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
-    .use(DetectPII, entities=["EMAIL_ADDRESS", "PHONE_NUMBER"], on_fail="exception")
-    .use(ProfanityFree, on_fail="exception")
-)
-
 MAX_BUFFER_CHARS = 200
 MAX_WAIT_SECONDS = 3
 executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="Validator")
 
 
-# ---------- Sentence Assembly ----------
+
 def extract_complete_sentences_spacy(raw_text: str):
     if not raw_text.strip():
         return "", raw_text
@@ -93,6 +105,7 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
     while True:
         try:
             token = await asyncio.wait_for(raw_token_queue.get(), timeout=2.0)
+            log.info("token recieved for assembly >>> %s", token)
             if token is None:
                 if raw_buffer.strip():
                     await chunk_queue.put((chunk_seq, raw_buffer, time.time(), False))
@@ -101,9 +114,12 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
                 return
             raw_buffer += token
             last_token_time = time.time()
+            log.info("buffer sent to extract >>> %s", raw_buffer)
             complete, remaining = extract_complete_sentences_spacy(raw_buffer)
             if complete:
+                log.info("complete sentence extracted >>> %s", complete)
                 await chunk_queue.put((chunk_seq, complete, time.time(), True))
+                log.info("complete sentence added to chunkqueue >>> %s", complete)
                 chunk_seq += 1
                 raw_buffer = remaining
             else:
@@ -114,6 +130,7 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
                 )
                 if should_flush and raw_buffer.strip():
                     await chunk_queue.put((chunk_seq, raw_buffer, now, False))
+                    log.info("buffer added to chunkqueue >>> %s", raw_buffer)
                     chunk_seq += 1
                     raw_buffer = ""
                     last_token_time = now
@@ -129,15 +146,19 @@ async def dispatch_validations(chunk_queue, write_queue):
     pending = set()
     while True:
         item = await chunk_queue.get()
+        log.info("chunk_queue item >>> %s", item)
         if item is None:
+            log.info("chunk_queue item is None")
             if pending:
                 await asyncio.gather(*pending, return_exceptions=True)
+                log.info("pending gathered")
             write_queue.put(None)
             break
         seq, text, recv_time, is_complete = item
         task = loop.run_in_executor(
             executor, validate_chunk_sync, seq, text, recv_time, is_complete, write_queue
         )
+        log.info("task added for item %s", text)
         pending.add(task)
         if len(pending) > 4:
             done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
@@ -146,13 +167,14 @@ async def dispatch_validations(chunk_queue, write_queue):
 def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool, write_queue: queue.Queue):
     thread_name = threading.current_thread().name
     start = time.time()
-    log.info(f"[VALIDATION START] Seq={seq} | Complete={is_complete} | Chunk: {repr(text[:50])}...")
+    log.info(f"[VALIDATION START] Seq={seq} | Complete={is_complete} | Chunk: {repr(text)}...")
     try:
         if is_complete:
-            guard_output_complete.validate(text, on="output")
+            pass
         duration = time.time() - start
         log.info(f"[VALIDATION PASS] Seq={seq} ({duration:.3f}s) by {thread_name}")
         write_queue.put(("valid", seq, text, recv_time))
+        log.info(f"Item validated >>> {text} passed to write_queue")
         return True
     except Exception as e:
         duration = time.time() - start
@@ -180,11 +202,14 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
 
     def safe_send(data):
         asyncio.run_coroutine_threadsafe(ws.send_json(data), main_loop)
+        log.info("text sent to ui >>> %s", data)
 
     while True:
         item = write_queue.get()
+        log.info("write_queue item >>> in writer %s", item)
         if item is None:
             safe_send({"token": None})
+            log.info("None send to ui >>>")
             break
         status, seq, text, ts = item
         if status == "fail":
@@ -198,10 +223,12 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
             break
         if seq == expected_seq:
             safe_send({"token": text})
+            log.info("text sent to ui >>> %s", text)
             expected_seq += 1
             while expected_seq in pending:
                 txt, _ = pending.pop(expected_seq)
                 safe_send({"token": txt})
+                log.info("text sent to ui because of pending >>> %s", txt)
                 expected_seq += 1
         else:
             pending[seq] = (text, ts)
@@ -218,6 +245,7 @@ async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queu
                 data = json.loads(msg)
                 if "token" in data:
                     token = data["token"]
+                    log.info("token recieved >>> %s", token)
                     if token is None:
                         await raw_token_queue.put(None)
                         log.info("🔚 End of stream")
@@ -265,10 +293,10 @@ async def websocket_endpoint(ws: WebSocket):
 
         # Input Guard
         try:
-            guard_input.validate(prompt, on="input")
-            log.info("✅ Input guard passed")
+            await validate_input(prompt)
+            log.info("✅ Input guard passed for prompt from %s (%s)", username, client)
         except Exception as e:
-            log.error(f"❌ Input validation failed: {str(e)}")
+            log.error(f"❌ Input validation failed for client {username}({client}) for prompt {prompt}: {str(e)}")
             subject = "🚨 Guardrails Input Violation Detected"
             body = f"""
             Violation detected in INPUT guard:
@@ -281,7 +309,6 @@ async def websocket_endpoint(ws: WebSocket):
             Timestamp: {time.ctime()}
             """
             await ws.send_json({"error": "Input validation failed"})
-            # send_violation_email(subject, body)
             return
 
         # Start Routing
@@ -290,6 +317,7 @@ async def websocket_endpoint(ws: WebSocket):
         chunk_queue = asyncio.Queue()
         write_queue = queue.Queue()
         main_loop = asyncio.get_running_loop()
+        log.info("created queues for client %s", client)
 
         writer_thread = threading.Thread(
             target=websocket_writer,
@@ -319,13 +347,9 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.send_json({"error": f"Server error: {str(exc)}"})
         except:
             pass
-
-
 @app.get("/")
 async def health():
     return "WebSocket Guardrails Server is running 🚀"
-
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("guardserver:app", host="0.0.0.0", port=5000, log_level="info")

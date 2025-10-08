@@ -11,7 +11,7 @@ import threading
 
 logger = logging.getLogger("chatbot")
 ui_logger = logging.getLogger("ui_response")
-WS_URL = "ws://localhost:5000/guard"  # guard-server
+WS_URL = "ws://localhost:5000/guard"
 
 
 # ------------------------------------------------------------------
@@ -68,18 +68,24 @@ class WsClient:
         while True:
             try:
                 item = self._q.get(timeout=10)
+                logger.info("item from queue in stream >>> %s", item)
             except queue.Empty:
                 break
             if isinstance(item, dict):
                 if "token" in item:
                     if item["token"] is None:
+                        logger.info("token is None in stream >>>")
                         break
+                    logger.info("token in stream tielding >>> %s", item["token"])
                     yield item["token"]
                 else:
+                    logger.info("item in stream tielding >>> %s", item)
                     yield item
                     if "error" in item:
+                        logger.info("error in stream >>> %s", item["error"])
                         break
             else:
+                logger.info("item in stream tielding >>> %s", item)
                 yield str(item)
 
 # ------------------------------------------------------------------
@@ -319,7 +325,9 @@ def main():
                             break
                         logger.info("Received payload from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                         if isinstance(payload, dict):
+                            logger.info("Received payload from guard-server for user in instance checking %s (%s): %s", meta["username"], meta["ip"], payload)
                             if "error" in payload:
+                                logger.error("Received error from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload["error"])
                                 thinking.empty()
                                 error_ui = "Validation error has occurred. Sorry, try your response again."
                                 placeholder.error(error_ui)
@@ -336,6 +344,7 @@ def main():
                             elif "response" in payload:
                                 thinking.empty()
                                 # ---- simulated typing ----
+                                logger.info("Received response as 'response block' from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload["response"])
                                 for ch in payload["response"]:
                                     full_text += ch
                                     placeholder.markdown(full_text + "▌")
@@ -343,6 +352,7 @@ def main():
                                 break
                         else:
                             thinking.empty()
+                            logger.info("Received response as 'stream block' from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                             # ---- simulated typing ----
                             for ch in payload:
                                 full_text += ch
