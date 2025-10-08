@@ -4,9 +4,7 @@ import logging
 import time
 import threading
 import queue
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 import websockets as ws_client
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -15,32 +13,46 @@ from guardrails.hub import ToxicLanguage, ProfanityFree, DetectPII
 import spacy
 from logging_config import setup_logging, get_guardrails_logger
 from router_agent import router
+from dotenv import load_dotenv
+import os
 
-# ---------- Email Configuration ----------
-ADMIN_EMAIL = "akashpr715@gmail.com"     # where alerts go
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USERNAME = "akashanil456@gmail.com"       # sender Gmail address
-SMTP_PASSWORD = "llmfsasvixvilqct"     # app password, not normal Gmail password
+load_dotenv()
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
 
-# ---------- Email Helper ----------
+# ---------- Email Configuration (SendGrid) ----------
+
+
+# ---------- Email Helper (SendGrid API) ----------
 def send_violation_email(subject: str, body: str, recipient: str = ADMIN_EMAIL):
-    msg = MIMEMultipart()
-    msg["From"] = SMTP_USERNAME
-    msg["To"] = recipient
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    url = "https://api.sendgrid.com/v3/mail/send"
+    headers = {
+        "Authorization": f"Bearer {SENDGRID_API_KEY}",  # ← SPACE after 'Bearer'
+        "Content-Type": "application/json"
+    }
+    data = {
+        "personalizations": [{"to": [{"email": recipient}]}],
+        "from": {"email": SENDGRID_FROM_EMAIL},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": body.strip()}]
+    }
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.send_message(msg)
-        print(f"📧 Email sent to {recipient}")
-        log.info(f"📧 Email sent to {recipient} for violation with details")
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        log.info(f"📤 SendGrid API request sent. Status: {response.status_code}")
+        if response.status_code == 202:
+            log.info(f"✅ Email accepted by SendGrid for {recipient}")
+        else:
+            log.error(f"❌ SendGrid API error {response.status_code}: {response.text}")
+            # Log full request for debugging (temporarily)
+            log.debug(f"Request payload: {json.dumps(data, indent=2)}")
+    except requests.exceptions.Timeout:
+        log.error("❌ SendGrid request timed out")
+    except requests.exceptions.RequestException as e:
+        log.exception(f"❌ Network error sending email: {e}")
     except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-
+        log.exception(f"❌ Unexpected error in send_violation_email: {e}")
 
 # ---------- NLP + Guard Setup ----------
 nlp = spacy.load("en_core_web_sm")
@@ -158,7 +170,7 @@ def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool
         duration = time.time() - start
         log.error(f"[VALIDATION FAIL] Seq={seq} ({duration:.3f}s) by {thread_name} → {str(e)}")
 
-        # 🚨 Send Email Alert
+        # 🚨 Send Email Alert via SendGrid
         subject = "🚨 Guardrails Output Violation Detected"
         body = f"""
         Violation detected in OUTPUT guard:
@@ -280,8 +292,8 @@ async def websocket_endpoint(ws: WebSocket):
             Error: {str(e)}
             Timestamp: {time.ctime()}
             """
-            await ws.send_json({"error": "Input validation failed"})
             send_violation_email(subject, body)
+            await ws.send_json({"error": "Input validation failed"})
             return
 
         # Start Routing
