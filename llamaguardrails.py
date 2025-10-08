@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-FastAPI WebSocket guard-server  (Llama-Guard-3 edition)
-––––––––––––––––––––––––––––––––
-- Accepts a JSON prompt via WebSocket
-- Validates  input  with Llama-Guard-3 (Ollama)
-- Streams tokens from a downstream model
-- Validates  output  with Llama-Guard-3
-- Returns tokens to the UI
-- (Optional) e-mail alerts  –  currently COMMENTED OUT
-Everything else (routes, queues, threads, logging, message shapes, …)
-is identical to the original Guardrails-AI version.
-"""
-
 import asyncio
 import json
 import logging
@@ -139,10 +126,13 @@ async def dispatch_validations(chunk_queue, write_queue):
             write_queue.put(None)
             break
         seq, text, recv_time, is_complete = item
-        task = loop.run_in_executor(executor, validate_chunk_sync, seq, text, recv_time, is_complete, write_queue)
+        task = loop.run_in_executor(
+            executor, validate_chunk_sync, seq, text, recv_time, is_complete, write_queue
+        )
         pending.add(task)
         if len(pending) > 4:
             done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+
 
 def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool, write_queue: queue.Queue):
     thread_name = threading.current_thread().name
