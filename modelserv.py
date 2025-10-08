@@ -64,6 +64,8 @@ async def websocket_endpoint(ws: WebSocket):
                     # delta is a string (e.g., "Hello", " world", "!")
                     await manager.send_json(ws, {"token": delta})
                     all_streams+=delta  # Append each stream response to the list
+
+                await manager.send_json(ws, {"done": True})
             else:
                 # ---------- ONE-SHOT ----------
                 resp = await ollama.chat(

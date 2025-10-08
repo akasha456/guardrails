@@ -207,8 +207,8 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
     while True:
         item = write_queue.get()
         log.info("write_queue item >>> in writer %s", item)
-        if item is None:
-            safe_send({"token": None})
+        if item == "None":
+            safe_send({"token": 'None'})
             log.info("None send to ui >>>")
             break
         status, seq, text, ts = item
@@ -243,22 +243,22 @@ async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queu
             log.info("📤 Prompt sent")
             async for msg in model_ws:
                 data = json.loads(msg)
-                if "token" in data:
+                if "token" in data and data["token"] is not None:
                     token = data["token"]
                     log.info("token recieved >>> %s", token)
-                    if token is None:
-                        await raw_token_queue.put(None)
-                        log.info("🔚 End of stream")
-                        return
                     await raw_token_queue.put(token)
+                elif data.get("done", False):
+                    log.info("🔚 End of stream (done= true)")
+                    await raw_token_queue.put("None")
+                    return
                 elif "error" in data:
                     log.error(f"💥 Model error: {data['error']}")
-                    await raw_token_queue.put(None)
+                    await raw_token_queue.put("None")
                     return
-            await raw_token_queue.put(None)
+            await raw_token_queue.put("None")
     except Exception as e:
         log.exception(f"🔥 Stream error: {str(e)}")
-        await raw_token_queue.put(None)
+        await raw_token_queue.put("None")
 
 
 # ---------- FASTAPI APP ----------

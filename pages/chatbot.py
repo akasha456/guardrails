@@ -15,7 +15,7 @@ WS_URL = "ws://localhost:5000/guard"
 
 
 # ------------------------------------------------------------------
-# WebSocket client (unchanged logic, only doc-string clarified)
+# WebSocket client (fixed to rely ONLY on server-sent EOS)
 # ------------------------------------------------------------------
 class WsClient:
     """Thread-safe WebSocket client that streams tokens in real time."""
@@ -24,21 +24,19 @@ class WsClient:
         self._q = queue.Queue()
         self._active = False
 
-    # ---------- public entry ----------
     def send_prompt(self, prompt: str, meta: dict | None = None):
-        if self._active:
-            while not self._q.empty():
-                try:
-                    self._q.get_nowait()
-                except queue.Empty:
-                    break
+        # Clear any leftover messages from previous incomplete streams
+        while not self._q.empty():
+            try:
+                self._q.get_nowait()
+            except queue.Empty:
+                break
         self._active = True
         thread = threading.Thread(
             target=self._run_websocket, args=(prompt, meta or {}), daemon=True
         )
         thread.start()
 
-    # ---------- background ----------
     def _run_websocket(self, prompt: str, meta: dict):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -48,45 +46,53 @@ class WsClient:
             self._q.put({"error": str(e)})
         finally:
             loop.close()
-            self._q.put({"token": None})  # EOS marker
+            # ✅ DO NOT send {"token": None} here — server does it!
 
     async def _async_send(self, prompt: str, meta: dict):
         try:
             async with websockets.connect(self.url) as ws:
-                payload = {"prompt": prompt, **meta}  # <-- inject meta
+                payload = {"prompt": prompt, **meta}
                 await ws.send(json.dumps(payload))
                 async for msg in ws:
                     data = json.loads(msg)
                     self._q.put(data)
+                    # Stop consuming once we get end-of-stream or error
                     if data.get("token") is None or "error" in data:
+                        if data.get("token") is None:
+                            logger.info("✅ Received end-of-stream signal from guardrails server")
                         break
         except Exception as e:
             self._q.put({"error": str(e)})
 
-    # ---------- consumer ----------
     def stream(self):
         while True:
             try:
-                item = self._q.get(timeout=10)
+                item = self._q.get()
                 logger.info("item from queue in stream >>> %s", item)
             except queue.Empty:
-                break
+                break  # Won't happen with blocking get(), but safe
+
             if isinstance(item, dict):
                 if "token" in item:
-                    if item["token"] is None:
-                        logger.info("token is None in stream >>>")
+                    if item["token"] == "None":
+                        logger.info("✅ Stream ended (token=None received)")
                         break
-                    logger.info("token in stream tielding >>> %s", item["token"])
+                    logger.info("token in stream yielding >>> %s", item["token"])
                     yield item["token"]
-                else:
-                    logger.info("item in stream tielding >>> %s", item)
+                elif "response" in item:
+                    logger.info("one-shot response in stream yielding >>> %s", item)
                     yield item
-                    if "error" in item:
-                        logger.info("error in stream >>> %s", item["error"])
-                        break
+                elif "error" in item:
+                    logger.info("error in stream >>> %s", item["error"])
+                    yield item
+                    break
+                else:
+                    logger.warning("Unexpected dict in stream: %s", item)
+                    yield item
             else:
-                logger.info("item in stream tielding >>> %s", item)
+                logger.warning("Non-dict item in stream: %s", item)
                 yield str(item)
+
 
 # ------------------------------------------------------------------
 # Helpers
@@ -126,11 +132,9 @@ def add_notification(message, notification_type="info"):
         "type": notification_type,
         "timestamp": datetime.now().strftime("%H:%M:%S")
     })
-# ------------------------------------------------------------------
-# File attachment helper
-# ------------------------------------------------------------------
+
+
 def attach_text_file():
-    """Return the content of the uploaded text file (or None)."""
     uploaded = st.sidebar.file_uploader(
         "Attach a text file",
         type=["txt", "md", "py", "json", "yaml", "yml", "csv", "log"],
@@ -141,6 +145,7 @@ def attach_text_file():
         string_data = uploaded.read().decode("utf-8", errors="replace")
         return string_data
     return None
+
 
 def display_notifications():
     if 'notifications' in st.session_state and st.session_state.notifications:
@@ -196,7 +201,6 @@ def render_feedback_ui(idx: int):
 # Main
 # ------------------------------------------------------------------
 def main():
-    # ---------- auth ----------
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
         st.session_state.username = ""
@@ -209,7 +213,6 @@ def main():
         logger.warning("Unauthenticated access attempt to chat page by IP redirecting to login: %s.", ip_address)
         return
 
-    # ---------- session init ----------
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'selected_llm' not in st.session_state:
@@ -224,7 +227,6 @@ def main():
         logger.info(f"User {st.session_state.username} with IP {ip_address} accessed chatbot page.")
         st.session_state.chat_page_loaded = True
 
-    # ---------- sidebar ----------
     with st.sidebar:
         st.header(f"Welcome, {st.session_state.username}! 👋")
         selected_llm = st.selectbox("Select LLM Model", LLM_MODELS,
@@ -251,11 +253,9 @@ def main():
     st.session_state.selected_llm = selected_llm
     st.session_state.selected_guardrail = selected_guardrail
 
-    # ---------- header ----------
     st.title("🤖 Advanced Chatbot Interface")
     st.caption(f"Using {selected_llm} with {selected_guardrail} guardrails")
 
-    # ---------- message container (prevents full re-render) ----------
     msg_container = st.container()
     with msg_container:
         for idx, message in enumerate(st.session_state.messages):
@@ -266,19 +266,17 @@ def main():
                 if message["role"] == "assistant":
                     render_feedback_ui(idx)
 
-
-    # ---------- input ----------
     prompt_box = st.chat_input("Type your message here...")
     if prompt_box is not None:
         prompt = prompt_box
-        if attached_text:                       # <-- NEW
-                prompt = f"{prompt}\n\n---\n{attached_text}"  # simple 
-        # user message
+        if attached_text:
+            prompt = f"{prompt}\n\n---\n{attached_text}"
+
         st.session_state.messages.append({"role": "user", "content": prompt})
         with msg_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
-        
+
         meta = {
             "username": st.session_state.username,
             "ip": ip_address,
@@ -290,7 +288,6 @@ def main():
             meta["username"], meta["ip"], meta["model"], meta["guard"], prompt
         )
 
-        # assistant placeholder
         placeholder_msg = {
             "role": "assistant",
             "content": "",
@@ -300,11 +297,10 @@ def main():
         st.session_state.messages.append(placeholder_msg)
         idx = len(st.session_state.messages) - 1
 
-        # ---------- streaming ----------
         try:
             if "ws_client" not in st.session_state:
                 st.session_state.ws_client = WsClient(WS_URL)
-                time.sleep(0.5)
+                time.sleep(0.1)
 
             st.session_state.gen_id += 1
             current_gen = st.session_state.gen_id
@@ -322,50 +318,49 @@ def main():
 
                     for payload in st.session_state.ws_client.stream():
                         if current_gen != st.session_state.gen_id:
+                            logger.info("New generation started; aborting current stream.")
                             break
                         logger.info("Received payload from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                         if isinstance(payload, dict):
-                            logger.info("Received payload from guard-server for user in instance checking %s (%s): %s", meta["username"], meta["ip"], payload)
                             if "error" in payload:
                                 logger.error("Received error from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload["error"])
                                 thinking.empty()
                                 error_ui = "Validation error has occurred. Sorry, try your response again."
                                 placeholder.error(error_ui)
-                                st.session_state.messages[idx]["content"]  = error_ui
+                                st.session_state.messages[idx]["content"] = error_ui
                                 st.session_state.messages[idx]["metadata"] = f"🛡️ guard-server rejected"
                                 st.session_state.messages[idx]["feedback"] = {"rating": None, "comment": ""}
                                 logger.info(
                                     "Assistant reply to user %s (%s) model=%s guard=%s : %s",
                                     meta["username"], meta["ip"], meta["model"], meta["guard"], error_ui
                                 )
-                                st.rerun()  
                                 stream_ok = False
                                 break
                             elif "response" in payload:
                                 thinking.empty()
-                                # ---- simulated typing ----
                                 logger.info("Received response as 'response block' from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload["response"])
                                 for ch in payload["response"]:
                                     full_text += ch
                                     placeholder.markdown(full_text + "▌")
-                                    time.sleep(0.015)   # <-- controls speed
+                                    time.sleep(0.015)
                                 break
                         else:
                             thinking.empty()
                             logger.info("Received response as 'stream block' from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
-                            # ---- simulated typing ----
                             for ch in payload:
                                 full_text += ch
                                 placeholder.markdown(full_text + "▌")
-                                time.sleep(0.015)       # <-- controls speed
+                                time.sleep(0.015)
 
                     if stream_ok and current_gen == st.session_state.gen_id:
-                        placeholder.markdown(full_text)  # final text without cursor
+                        placeholder.markdown(full_text)
                         st.session_state.messages[idx]["content"] = full_text
                         logger.info(
-                            "Recieved reply to user %s (%s) model=%s guard=%s : %s",
-                            meta["username"], meta["ip"], meta["model"], meta["guard"], len(full_text))
-                        st.rerun()   
+                            "Received reply to user %s (%s) model=%s guard=%s : %d chars",
+                            meta["username"], meta["ip"], meta["model"], meta["guard"], len(full_text)
+                        )
+                        st.rerun()
+
         except Exception as e:
             error_content = f"Error generating response: {str(e)}"
             st.session_state.messages.append({
@@ -379,6 +374,7 @@ def main():
                 "Error for user %s (%s): %s",
                 st.session_state.username, ip_address, str(e), exc_info=True
             )
-        
+
+
 if __name__ == "__main__":
     main()
