@@ -2,9 +2,11 @@
 """
 FastAPI WebSocket server that exposes Llama-3.2 (Ollama) to remote clients.
 """
+import uuid
 import datetime
 import asyncio
 import logging
+import time
 from typing import Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from ollama import AsyncClient  # pip install ollama
@@ -27,26 +29,31 @@ class ConnectionManager:
 
     async def connect(self, ws: WebSocket):
         await ws.accept()
-        self.active[ws.client.host] = ws
-        log.warning("Client %s connected", ws.client.host)
+        conn_id = f"{ws.client.host}-{time.time()}"
+        self.active[conn_id] = ws
+        log.warning("Client %s connected with id %s", ws.client.host, conn_id)
+        return conn_id
 
-    def disconnect(self, ws: WebSocket):
-        self.active.pop(ws.client.host, None)
-        log.warning("Client %s disconnected", ws.client.host)
+    def disconnect(self, conn_id: str, ws: WebSocket):
+        self.active.pop(conn_id, None)
+        log.warning("Client %s disconnected with id %s", ws.client.host, conn_id)
 
-    async def send_json(self, ws: WebSocket, data: dict):
-        try:
-            await ws.send_json(data)
-        except Exception:
-            pass
+    async def send_json(self, conn_id: str, data: dict):
+        ws=self.active[conn_id]
+        if ws:
+            try:
+                await ws.send_json(data)
+            except Exception:
+                pass
 
 
 manager = ConnectionManager()
 
 @app.websocket("/llama3.2")
 async def websocket_endpoint(ws: WebSocket):
-    client=await manager.connect(ws)
-    log.info("Client %s connected into ollama endpoint for generation", ws.client.host)
+    conn_id=await manager.connect(ws)
+    client_host=ws.client.host
+    log.info("Client %s connected(Id: %s) into ollama endpoint for generation", ws.client.host, conn_id)
     time_start=datetime.datetime.now()
     try:
         all_streams = ""  # Create a list to store all the stream responses
@@ -62,10 +69,10 @@ async def websocket_endpoint(ws: WebSocket):
                 ):
                     delta = part["message"]["content"]
                     # delta is a string (e.g., "Hello", " world", "!")
-                    await manager.send_json(ws, {"token": delta})
+                    await manager.send_json(conn_id, {"token": delta})
                     all_streams+=delta  # Append each stream response to the list
 
-                await manager.send_json(ws, {"done": True})
+                await manager.send_json(conn_id, {"token": None, "flag": True})
             else:
                 # ---------- ONE-SHOT ----------
                 resp = await ollama.chat(
@@ -74,17 +81,17 @@ async def websocket_endpoint(ws: WebSocket):
                     stream=False,
                 )
                 answer = resp["message"]["content"]
-                await manager.send_json(ws, {"response": answer})
+                await manager.send_json(conn_id, {"response": answer})
 
             latency = (datetime.datetime.now() - time_start).total_seconds() * 1000
 
             log.info("Prompt processed for client %s by ollama with latency %s", ws.client.host, latency)
         except Exception as exc:
             log.exception("Error while processing prompt for client %s: %s", ws.client.host, exc)
-            await manager.send_json(ws, {"error": str(exc)})
+            await manager.send_json(conn_id, {"error": str(exc), "flag": "model_server"})
     except WebSocketDisconnect:
         log.warning("Client %s disconnected from ollama endpoint", ws.client.host)
-        manager.disconnect(ws)
+        manager.disconnect(conn_id, ws)
 
 
 @app.websocket('/claude2')
