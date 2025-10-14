@@ -73,7 +73,7 @@ async def websocket_endpoint(ws: WebSocket):
                 )
                 answer = resp["message"]["content"]
                 await manager.send_json(ws, {"response": answer})
-
+            await manager.send_json(ws, {"token": None, "flag": True})
             latency = (datetime.datetime.now() - time_start).total_seconds() * 1000
 
             log.info("Prompt processed for client %s by ollama with latency %s", ws.client.host, latency)
@@ -104,7 +104,7 @@ async def websocket_endpoint(ws: WebSocket):
             for char in mock_response:
                 await manager.send_json(ws, {"token": char})
                 await asyncio.sleep(0.01)  # Simulate network delay
-            await manager.send_json(ws, {"token": None})
+            await manager.send_json(ws, {"token": None, "flag": True})
         
         else:
             mock_response = f"[MOCK] Claude-2 response to: {prompt}"
@@ -139,7 +139,7 @@ async def websocket_endpoint(ws: WebSocket):
             for char in mock_response:
                 await manager.send_json(ws, {"token": char})
                 await asyncio.sleep(0.01)
-            await manager.send_json(ws, {"token": None})
+            await manager.send_json(ws, {"token": None, "flag": True})
 
         else:
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
@@ -173,7 +173,7 @@ async def websocket_endpoint(ws: WebSocket):
             for char in mock_response:
                 await manager.send_json(ws, {"token": char})
                 await asyncio.sleep(0.01)
-            await manager.send_json(ws, {"token": None})
+            await manager.send_json(ws, {"token": None, "flag": True})
         else:
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
             await manager.send_json(ws, {"response": mock_response})

@@ -48,8 +48,6 @@ class WsClient:
             self._q.put({"error": str(e)})
         finally:
             loop.close()
-            self._q.put({"token": None})  # EOS marker
-
     async def _async_send(self, prompt: str, meta: dict):
         try:
             async with websockets.connect(self.url) as ws:
@@ -59,6 +57,7 @@ class WsClient:
                     data = json.loads(msg)
                     self._q.put(data)
                     if data.get("token") is None or "error" in data:
+                        logger.info(f"Stream ended for client {meta['username']}")
                         break
         except Exception as e:
             self._q.put({"error": str(e)})
@@ -317,7 +316,6 @@ def main():
                     for payload in st.session_state.ws_client.stream():
                         if current_gen != st.session_state.gen_id:
                             break
-                        logger.info("Received payload from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                         if isinstance(payload, dict):
                             if "error" in payload:
                                 thinking.empty()

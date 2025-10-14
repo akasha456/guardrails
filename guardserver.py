@@ -105,12 +105,13 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
     while True:
         try:
             token = await asyncio.wait_for(raw_token_queue.get(), timeout=2.0)
-            if token is None:
-                if raw_buffer.strip():
-                    await chunk_queue.put((chunk_seq, raw_buffer, time.time(), False))
-                    chunk_seq += 1
-                await chunk_queue.put(None)
-                return
+            if isinstance(token, dict):
+                if token.get("flag", False) is True:
+                    if raw_buffer.strip():
+                        await chunk_queue.put((chunk_seq, raw_buffer, time.time(), False))
+                        chunk_seq += 1
+                    await chunk_queue.put(token)
+                    return
             raw_buffer += token
             last_token_time = time.time()
             complete, remaining = extract_complete_sentences_spacy(raw_buffer)
@@ -141,11 +142,12 @@ async def dispatch_validations(chunk_queue, write_queue):
     pending = set()
     while True:
         item = await chunk_queue.get()
-        if item is None:
-            if pending:
-                await asyncio.gather(*pending, return_exceptions=True)
-            write_queue.put(None)
-            break
+        if isinstance(item, dict):
+            if item.get("flag", False):
+                if pending:
+                    await asyncio.gather(*pending, return_exceptions=True)
+                write_queue.put(item)
+                break
         seq, text, recv_time, is_complete = item
         task = loop.run_in_executor(
             executor, validate_chunk_sync, seq, text, recv_time, is_complete, write_queue
@@ -158,12 +160,10 @@ async def dispatch_validations(chunk_queue, write_queue):
 def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool, write_queue: queue.Queue):
     thread_name = threading.current_thread().name
     start = time.time()
-    log.info(f"[VALIDATION START] Seq={seq} | Complete={is_complete} | Chunk: {repr(text[:50])}...")
     try:
         if is_complete:
             guard_output_complete.validate(text, on="output")
         duration = time.time() - start
-        log.info(f"[VALIDATION PASS] Seq={seq} ({duration:.3f}s) by {thread_name}")
         write_queue.put(("valid", seq, text, recv_time))
         return True
     except Exception as e:
@@ -195,9 +195,11 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
 
     while True:
         item = write_queue.get()
-        if item is None:
-            safe_send({"token": None})
-            break
+        if "token" in item:
+            log.info("🔚 End of stream in writer for client %s", ws.client.host)
+            if item.get("token", False) is None:
+                ws.send_json({"token": "None", "flag":"fuck you bitch"}) 
+                break
         status, seq, text, ts = item
         if status == "fail":
             log.error("❌ Validation failed → aborting stream")
@@ -220,7 +222,7 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
         write_queue.task_done()
 
 
-async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queue):
+async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queue, write_queue: asyncio.Queue):
     log.info("🚀 Connecting to model server...")
     try:
         async with ws_client.connect(url) as model_ws:
@@ -229,17 +231,16 @@ async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queu
             async for msg in model_ws:
                 data = json.loads(msg)
                 if "token" in data:
-                    token = data["token"]
-                    if token is None:
-                        await raw_token_queue.put(None)
-                        log.info("🔚 End of stream")
+                    if data["token"] is None and data.get("flag", False):
+                        await raw_token_queue.put(data)
+                        log.info("🔚 End of stream from model for client")
                         return
+                    token = data["token"]
                     await raw_token_queue.put(token)
                 elif "error" in data:
                     log.error(f"💥 Model error: {data['error']}")
                     await raw_token_queue.put(None)
                     return
-            await raw_token_queue.put(None)
     except Exception as e:
         log.exception(f"🔥 Stream error: {str(e)}")
         await raw_token_queue.put(None)
@@ -313,11 +314,13 @@ async def websocket_endpoint(ws: WebSocket):
 
         assembler_task = asyncio.create_task(assemble_sentences(raw_token_queue, chunk_queue))
         dispatcher_task = asyncio.create_task(dispatch_validations(chunk_queue, write_queue))
-        await stream_producer(model_payload, url, raw_token_queue)
+        await stream_producer(model_payload, url, raw_token_queue, write_queue)
 
         await assembler_task
         await dispatcher_task
         writer_thread.join(timeout=5)
+        await ws.send_json({"token": None, "flag": True})
+        log.info("🔚Processed completely for client %s",ws.client.host)
         if writer_thread.is_alive():
             log.warning("⚠️ Writer thread did not terminate cleanly for client %s", client)
         else:
