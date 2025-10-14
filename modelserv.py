@@ -96,8 +96,8 @@ async def websocket_endpoint(ws: WebSocket):
 
 @app.websocket('/claude2')
 async def websocket_endpoint(ws: WebSocket):
-    await manager.connect(ws)
-    log.info("Client %s connected into claude2 endpoint for generation", ws.client.host)
+    conn_id=await manager.connect(ws)
+    log.info("Client %s connected(Id: %s) into ollama endpoint for generation", ws.client.host, conn_id)
     try:
         msg = await ws.receive_json()
         messages=msg.get("messages")
@@ -111,27 +111,27 @@ async def websocket_endpoint(ws: WebSocket):
                  "We will be establishing it shortly.\n"
             )
             for char in mock_response:
-                await manager.send_json(ws, {"token": char})
+                await manager.send_json(conn_id, {"token": char})
                 await asyncio.sleep(0.01)  # Simulate network delay
-            await manager.send_json(ws, {"token": None})
+            await manager.send_json(conn_id, {"token": None, "flag": True})
         
         else:
             mock_response = f"[MOCK] Claude-2 response to: {prompt}"
-            await manager.send_json(ws, {"response": mock_response})
+            await manager.send_json(conn_id, {"response": mock_response})
         log.info("Prompt processed for client by claude for ip %s", ws.client.host)
     except WebSocketDisconnect:
         log.warning("Client %s disconnected from claude2 endpoint", ws.client.host)
-        manager.disconnect(ws)
+        manager.disconnect(conn_id,ws)
     except Exception as e:
         log.exception("Claude  error: %s", e)
-        await manager.send_json(ws, {"error": "Mock Claude error"})
+        await manager.send_json(conn_id, {"error": "Mock Claude error"})
 
 
 
 @app.websocket('/gpt4')
 async def websocket_endpoint(ws: WebSocket):
-    await manager.connect(ws)
-    log.info("Client %s connected into gpt4 endpoint for generation", ws.client.host)
+    conn_id=await manager.connect(ws)
+    log.info("Client %s connected(Id: %s) into ollama endpoint for generation", ws.client.host, conn_id)
     try:
         msg = await ws.receive_json()
         stream = msg.get("stream", True)
@@ -146,26 +146,26 @@ async def websocket_endpoint(ws: WebSocket):
                 "We will be establishing it shortly.\n"
             )
             for char in mock_response:
-                await manager.send_json(ws, {"token": char})
+                await manager.send_json(conn_id, {"token": char})
                 await asyncio.sleep(0.01)
-            await manager.send_json(ws, {"token": None})
+            await manager.send_json(conn_id, {"token": None, "flag": True})
 
         else:
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
-            await manager.send_json(ws, {"response": mock_response})
+            await manager.send_json(conn_id, {"response": mock_response})
         log.info("Prompt processed for client by claude for ip %s", ws.client.host)
     except WebSocketDisconnect:
-        manager.disconnect(ws)
+        manager.disconnect(conn_id,ws)
         log.warning("Client %s disconnected from gpt4 endpoint", ws.client.host)
     except Exception as e:
         log.exception("GPT-4 mock error: %s", e)
-        await manager.send_json(ws, {"error": "Mock GPT-4 error"})
+        await manager.send_json(conn_id, {"error": "Mock GPT-4 error"})
 
 
 @app.websocket('/vllm')
 async def websocket_endpoint(ws: WebSocket):
-    await manager.connect(ws)
-    log.info("Client %s connected into vllm endpoint for generation", ws.client.host)
+    conn_id=await manager.connect(ws)
+    log.info("Client %s connected(Id: %s) into ollama endpoint for generation", ws.client.host, conn_id)
     try:
         msg = await ws.receive_json()
         stream = msg.get("stream", True)
@@ -180,19 +180,19 @@ async def websocket_endpoint(ws: WebSocket):
                 "We will be establishing it shortly.\n"
             )
             for char in mock_response:
-                await manager.send_json(ws, {"token": char})
+                await manager.send_json(conn_id, {"token": char})
                 await asyncio.sleep(0.01)
-            await manager.send_json(ws, {"token": None})
+            await manager.send_json(conn_id, {"token": None, "flag": True})
         else:
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
-            await manager.send_json(ws, {"response": mock_response})
+            await manager.send_json(conn_id, {"response": mock_response})
         log.info("Prompt processed for client by vllm for ip %s", ws.client.host)
     except WebSocketDisconnect:
-        manager.disconnect(ws)
+        manager.disconnect(conn_id,ws)
         log.warning("Client %s disconnected from vllm endpoint", ws.client.host)
     except Exception as e:
         log.exception("vllm mock error: %s", e)
-        await manager.send_json(ws, {"error": "Mock GPT-4 error"})
+        await manager.send_json(conn_id, {"error": "Mock GPT-4 error"})
 @app.get("/")
 async def health():
     return "FastAPI Llama-3.2 WebSocket server is running."
