@@ -14,32 +14,44 @@ import spacy
 import aiohttp
 from logging_config import setup_logging, get_guardrails_logger
 from router_agent import router
- 
-# # ---------- Email Configuration ----------
-# ADMIN_EMAIL = "akashpr.b22cs2113@mbcet.ac.in"
-# SMTP_SERVER = "smtp.gmail.com"
-# SMTP_PORT = 587
-# SMTP_USERNAME = "akashtrooper010@gmail.com"
-# SMTP_PASSWORD = "mecghhwywrmptrmb"
- 
-# # ---------- Email Helper ----------
-# def send_violation_email(subject: str, body: str, recipient: str = ADMIN_EMAIL):
-#     msg = MIMEMultipart()
-#     msg["From"] = SMTP_USERNAME
-#     msg["To"] = recipient
-#     msg["Subject"] = subject
-#     msg.attach(MIMEText(body, "plain"))
- 
-#     try:
-#         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-#             server.starttls()
-#             server.login(SMTP_USERNAME, SMTP_PASSWORD)
-#             server.send_message(msg)
-#         print(f"📧 Email sent to {recipient}")
-#         log.info(f"📧 Email sent to {recipient} for violation with details")
-#     except Exception as e:
-#         print(f"❌ Failed to send email: {e}")
- 
+from dotenv import load_dotenv
+import os
+import requests
+load_dotenv()
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
+# ---------- Email Helper (SendGrid API) ----------
+def send_violation_email(subject: str, body: str, recipient: str = ADMIN_EMAIL):
+    url = "https://api.sendgrid.com/v3/mail/send"
+    headers = {
+        "Authorization": f"Bearer {SENDGRID_API_KEY}",  # ← SPACE after 'Bearer'
+        "Content-Type": "application/json"
+    }
+    data = {
+        "personalizations": [{"to": [{"email": recipient}]}],
+        "from": {"email": SENDGRID_FROM_EMAIL},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": body.strip()}]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        log.info(f"📤 SendGrid API request sent. Status: {response.status_code}")
+        if response.status_code == 202:
+            log.info(f"✅ Email accepted by SendGrid for {recipient}")
+        else:
+            log.error(f"❌ SendGrid API error {response.status_code}: {response.text}")
+            # Log full request for debugging (temporarily)
+            log.debug(f"Request payload: {json.dumps(data, indent=2)}")
+    except requests.exceptions.Timeout:
+        log.error("❌ SendGrid request timed out")
+    except requests.exceptions.RequestException as e:
+        log.exception(f"❌ Network error sending email: {e}")
+    except Exception as e:
+        log.exception(f"❌ Unexpected error in send_violation_email: {e}")
+
+
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama-guard3"
  
@@ -167,20 +179,20 @@ def validate_chunk_sync(seq: int, text: str, recv_time: float, is_complete: bool
     except Exception as e:
         duration = time.time() - start
  
-        # # 🚨 Send Email Alert
-        # subject = "🚨 Guardrails Output Violation Detected"
-        # body = f"""
-        # Violation detected in OUTPUT guard:
-        # Sequence: {seq}
-        # Thread: {thread_name}
-        # Text: {text[:200]}...
-        # Error: {str(e)}
-        # Timestamp: {time.ctime()}
-        # """
-        # send_violation_email(subject, body)
+        # 🚨 Send Email Alert
+        subject = "🚨 Guardrails Output Violation Detected"
+        body = f"""
+        Violation detected in OUTPUT guard:
+        Sequence: {seq}
+        Thread: {thread_name}
+        Text: {text[:200]}...
+        Error: {str(e)}
+        Timestamp: {time.ctime()}
+        """
+        send_violation_email(subject, body)
  
-        # write_queue.put(("fail", seq, text, recv_time))
-        # return False
+        write_queue.put(("fail", seq, text, recv_time))
+        return False
  
  
 def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
@@ -296,6 +308,9 @@ async def websocket_endpoint(ws: WebSocket):
             Error: {str(e)}
             Timestamp: {time.ctime()}
             """
+
+            send_violation_email(subject, body)
+            
             await ws.send_json({"error": "Validation Failed",
                                 "flag": "input"})
             return
