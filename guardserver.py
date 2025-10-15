@@ -15,6 +15,7 @@ from logging_config import setup_logging, get_guardrails_logger
 from router_agent import router
 from dotenv import load_dotenv
 import os
+from guardrails.hub import BanList
 
 load_dotenv()
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
@@ -64,6 +65,7 @@ guard_output_complete = (
     Guard()
     .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
     .use(ProfanityFree, on_fail="exception")
+    
 )
 
 guard_input = (
@@ -71,6 +73,7 @@ guard_input = (
     .use(ToxicLanguage, threshold=0.5, validation_method="sentence", on_fail=OnFailAction.EXCEPTION)
     .use(DetectPII, entities=["EMAIL_ADDRESS", "PHONE_NUMBER"], on_fail="exception")
     .use(ProfanityFree, on_fail="exception")
+    .use(BanList(banned_words=['confidential','Confidential','CONFIDENTIAL']))
 )
 
 MAX_BUFFER_CHARS = 200
