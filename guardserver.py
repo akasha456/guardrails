@@ -232,12 +232,18 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
         else:
             pending[seq] = (text, ts)
         write_queue.task_done()
+    return
  
  
 async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queue, write_queue: asyncio.Queue):
     log.info("🚀 Connecting to model server...")
     try:
-        async with ws_client.connect(url) as model_ws:
+        async with ws_client.connect(
+            url,
+            ping_interval=30,    # Send ping every 30 sec
+            ping_timeout=60,     # Wait up to 60 sec for pong
+            close_timeout=60
+        ) as model_ws:
             await model_ws.send(json.dumps(payload))
             log.info("📤 Prompt sent")
             async for msg in model_ws:

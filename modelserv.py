@@ -11,7 +11,20 @@ from typing import Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from ollama import AsyncClient  # pip install ollama
 from logging_config import setup_logging, get_ollama_logger
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+KIMI_API_KEY = os.getenv("MOONSHOT_API_KEY")
+if not KIMI_API_KEY:
+    raise ValueError("MOONSHOT_API_KEY is missing in .env")
+
+kimi_client = OpenAI(
+    api_key=KIMI_API_KEY,
+    base_url="https://openrouter.ai/api/v1",  # ✅ Correct base URL (note: moonshot.cn, not .ai)
+)
 HOST = "0.0.0.0"
 PORT = 8765
 MODEL = "llama3.2"
@@ -193,6 +206,77 @@ async def websocket_endpoint(ws: WebSocket):
     except Exception as e:
         log.exception("vllm mock error: %s", e)
         await manager.send_json(conn_id, {"error": "Mock GPT-4 error"})
+
+@app.websocket("/kimi")
+async def websocket_endpoint_kimi(ws: WebSocket):
+    conn_id = await manager.connect(ws)
+    client_host = ws.client.host
+    log.info("Client %s connected (Id: %s) into kimi endpoint for generation", client_host, conn_id)
+    time_start = datetime.datetime.now()
+    try:
+        msg = await ws.receive_json()
+        model = msg.get("model", "kimi-k2-0905-preview")  # Default Kimi model
+        messages = msg.get("messages")
+        stream = msg.get("stream", True)
+
+        if not messages:
+            await manager.send_json(conn_id, {"error": "Missing 'messages' in payload"})
+            return
+
+        if stream:
+            # ---------- STREAMING MODE ----------
+            try:
+                response = kimi_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=True,
+                    temperature=0.7
+                )
+
+                async def stream_generator():
+                    for chunk in response:
+                        delta = chunk.choices[0].delta
+                        if delta.content:
+                            yield delta.content
+
+                # Stream tokens one by one
+                async for token in stream_generator():
+                    await manager.send_json(conn_id, {"token": token})
+
+                await manager.send_json(conn_id, {"token": None, "flag": True})
+                
+            except Exception as e:
+                log.exception("Kimi streaming error for client %s: %s", client_host, e)
+                await manager.send_json(conn_id, {"error": f"Kimi streaming failed: {str(e)}"})
+
+        else:
+            # ---------- NON-STREAMING (ONE-SHOT) MODE ----------
+            try:
+                response = kimi_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=False,
+                    temperature=0.7
+                )
+                answer = response.choices[0].message.content
+                await manager.send_json(conn_id, {"response": answer})
+
+            except Exception as e:
+                log.exception("Kimi non-streaming error for client %s: %s", client_host, e)
+                await manager.send_json(conn_id, {"error": f"Kimi request failed: {str(e)}"})
+
+        latency = (datetime.datetime.now() - time_start).total_seconds() * 1000
+        log.info("Prompt processed for client %s by kimi with latency %.2f ms", client_host, latency)
+
+    except WebSocketDisconnect:
+        log.warning("Client %s disconnected from kimi endpoint", client_host)
+        manager.disconnect(conn_id, ws)
+    except Exception as exc:
+        log.exception("Unexpected error in kimi WebSocket handler for %s: %s", client_host, exc)
+        try:
+            await manager.send_json(conn_id, {"error": f"Server error: {str(exc)}"})
+        except:
+            pass
 @app.get("/")
 async def health():
     return "FastAPI Llama-3.2 WebSocket server is running."
