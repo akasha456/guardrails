@@ -25,35 +25,10 @@ def save_users(users):
 import requests
 
 def get_client_ip():
-    """Get client IP: real IP when deployed, public IP of server when on localhost."""
-    try:
-        # Try to get real client IP (works in cloud deployments)
-        ip = st.context.headers.get("X-Forwarded-For")
-        if ip:
-            return ip.split(",")[0].strip()
-    except Exception:
-        pass
-
-    # Fallback 1: Check if Host is localhost
-    try:
-        host = st.context.headers.get("Host", "").split(":")[0]
-        if host in ["localhost", "127.0.0.1", "::1"]:
-            # You're on localhost → get YOUR public IP (for demo only)
-            try:
-                response = requests.get("https://api.ipify.org?format=text", timeout=3)
-                if response.status_code == 200:
-                    return response.text.strip()
-            except:
-                pass
-            return "127.0.0.1"  # final fallback
-    except Exception:
-        pass
-
-    # Fallback 2: return Host IP if not localhost
-    try:
-        return st.context.headers.get("Host", "unknown").split(":")[0]
-    except:
-        return "unknown"
+    if hasattr(st.context, 'ip_address'):
+        return st.context.ip_address
+    else:
+        return "ip not dound"
 
 def log_login_attempt(username, success, ip_address):
     """Log login attempts to a JSON file."""

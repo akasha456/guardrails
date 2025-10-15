@@ -90,26 +90,11 @@ class WsClient:
 # Helpers
 # ------------------------------------------------------------------
 def get_client_ip():
-    try:
-        ip = st.context.headers.get("X-Forwarded-For")
-        if ip:
-            return ip.split(",")[0].strip()
-    except Exception:
-        pass
- 
-    try:
-        host = st.context.headers.get("Host", "").split(":")[0]
-        if host in ["localhost", "127.0.0.1", "::1"]:
-            try:
-                response = requests.get("https://api.ipify.org?format=text", timeout=3)
-                if response.status_code == 200:
-                    return response.text.strip()
-            except:
-                pass
-            return "127.0.0.1"
-    except Exception:
-        pass
-    return "unknown"
+    if hasattr(st.context, 'ip_address'):
+        return st.context.ip_address
+    else:
+        return "ip address error"
+    
  
  
 LLM_MODELS = ["llama-3.2", "claude-2", "gpt-4", "VLLM"]

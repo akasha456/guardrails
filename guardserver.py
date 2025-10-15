@@ -267,14 +267,13 @@ app = FastAPI()
 @app.websocket("/guard")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    client = ws.client.host
-    log.info("Client %s connected into guardserver endpoint for generation.", client)
     try:
         data = await ws.receive_json()
         prompt = data.get("prompt", "")
         username = data.get("username", "")
         model = data.get("model", "")
         guard_type = data.get("guard", "")
+        client = data.get("ip", ws.client.host)
         meta = {
             "username": username,
             "model": model,
@@ -283,7 +282,7 @@ async def websocket_endpoint(ws: WebSocket):
             "ip": client,
             "timestamp": time.time(),
         }
- 
+        log.info("Client %s connected into guardserver endpoint for generation.", client)
         if not prompt:
             await ws.send_json({"error": "Prompt is required"})
             log.error("❌ Missing prompt for %s (%s)", username, client)
