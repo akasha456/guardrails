@@ -6,3 +6,4 @@ users.json
 test.py
 temp.py
 .gitignore
+.env
