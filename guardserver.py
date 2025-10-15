@@ -199,7 +199,6 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
     while True:
         item = write_queue.get()
         if "token" in item:
-            log.info("🔚 End of stream in writer for client %s", ws.client.host)
             if item.get("token", False) is None:
                 ws.send_json({"token": "None", "flag":"fuck you bitch"}) 
                 break
@@ -255,14 +254,14 @@ app = FastAPI()
 @app.websocket("/guard")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    client = ws.client.host
-    log.info("Client %s connected into guardserver endpoint for generation.", client)
     try:
         data = await ws.receive_json()
         prompt = data.get("prompt", "")
         username = data.get("username", "")
         model = data.get("model", "")
         guard_type = data.get("guard", "")
+        client = data.get("ip", ws.client.host)
+        log.info("Client %s connected into guardserver endpoint for generation.", client)
         meta = {
             "username": username,
             "model": model,
@@ -323,7 +322,7 @@ async def websocket_endpoint(ws: WebSocket):
         await dispatcher_task
         writer_thread.join(timeout=5)
         await ws.send_json({"token": None, "flag": True})
-        log.info("🔚Processed completely for client %s",ws.client.host)
+        log.info("🔚Processed completely for client %s",client)
         if writer_thread.is_alive():
             log.warning("⚠️ Writer thread did not terminate cleanly for client %s", client)
         else:
