@@ -99,6 +99,8 @@ async def websocket_endpoint(ws: WebSocket):
             latency = (datetime.datetime.now() - time_start).total_seconds() * 1000
 
             log.info("Prompt processed for client %s by ollama with latency %s", ws.client.host, latency)
+            manager.disconnect(conn_id,ws)
+            log.warning("Client %s disconnected from ollama endpoint after generation", ws.client.host)
         except Exception as exc:
             log.exception("Error while processing prompt for client %s: %s", ws.client.host, exc)
             await manager.send_json(conn_id, {"error": str(exc), "flag": "model_server"})
@@ -132,6 +134,8 @@ async def websocket_endpoint(ws: WebSocket):
             mock_response = f"[MOCK] Claude-2 response to: {prompt}"
             await manager.send_json(conn_id, {"response": mock_response})
         log.info("Prompt processed for client by claude for ip %s", ws.client.host)
+        manager.disconnect(conn_id,ws)
+        log.warning("Client %s disconnected from ollama endpoint after generation", ws.client.host)
     except WebSocketDisconnect:
         log.warning("Client %s disconnected from claude2 endpoint", ws.client.host)
         manager.disconnect(conn_id,ws)
@@ -167,6 +171,8 @@ async def websocket_endpoint(ws: WebSocket):
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
             await manager.send_json(conn_id, {"response": mock_response})
         log.info("Prompt processed for client by claude for ip %s", ws.client.host)
+        manager.disconnect(conn_id,ws)
+        log.warning("Client %s disconnected from ollama endpoint after generation", ws.client.host)
     except WebSocketDisconnect:
         manager.disconnect(conn_id,ws)
         log.warning("Client %s disconnected from gpt4 endpoint", ws.client.host)
@@ -200,6 +206,8 @@ async def websocket_endpoint(ws: WebSocket):
             mock_response = f"[MOCK] GPT-4 response to: {prompt}"
             await manager.send_json(conn_id, {"response": mock_response})
         log.info("Prompt processed for client by vllm for ip %s", ws.client.host)
+        manager.disconnect(conn_id,ws)
+        log.warning("Client %s disconnected from ollama endpoint after generation", ws.client.host)
     except WebSocketDisconnect:
         manager.disconnect(conn_id,ws)
         log.warning("Client %s disconnected from vllm endpoint", ws.client.host)
@@ -267,7 +275,8 @@ async def websocket_endpoint_kimi(ws: WebSocket):
 
         latency = (datetime.datetime.now() - time_start).total_seconds() * 1000
         log.info("Prompt processed for client %s by kimi with latency %.2f ms", client_host, latency)
-
+        manager.disconnect(conn_id,ws)
+        log.warning("Client %s disconnected from ollama endpoint after generation", ws.client.host)
     except WebSocketDisconnect:
         log.warning("Client %s disconnected from kimi endpoint", client_host)
         manager.disconnect(conn_id, ws)
