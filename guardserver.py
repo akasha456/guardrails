@@ -117,12 +117,13 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
     while True:
         try:
             token = await asyncio.wait_for(raw_token_queue.get(), timeout=2.0)
-            if token is None:
-                if raw_buffer.strip():
-                    await chunk_queue.put((chunk_seq, raw_buffer, time.time(), False))
-                    chunk_seq += 1
-                await chunk_queue.put(None)
-                return
+            if isinstance(token, dict):
+                if token.get("flag", False) is True:
+                    if raw_buffer.strip():
+                        await chunk_queue.put((chunk_seq, raw_buffer, time.time(), False))
+                        chunk_seq += 1
+                    await chunk_queue.put(token)
+                    return
             raw_buffer += token
             last_token_time = time.time()
             complete, remaining = extract_complete_sentences_spacy(raw_buffer)
@@ -153,11 +154,12 @@ async def dispatch_validations(chunk_queue, write_queue):
     pending = set()
     while True:
         item = await chunk_queue.get()
-        if item is None:
-            if pending:
-                await asyncio.gather(*pending, return_exceptions=True)
-            write_queue.put(None)
-            break
+        if isinstance(item, dict):
+            if item.get("flag", False) is True:
+                if pending:
+                    await asyncio.gather(*pending, return_exceptions=True)
+                write_queue.put(item)
+                break
         seq, text, recv_time, is_complete = item
         task = loop.run_in_executor(
             executor, validate_chunk_sync, seq, text, recv_time, is_complete, write_queue
@@ -250,16 +252,15 @@ async def stream_producer(payload: dict, url: str, raw_token_queue: asyncio.Queu
                 data = json.loads(msg)
                 if "token" in data:
                     if data["token"] is None and data.get("flag", False):
-                        write_queue.put(data)
-                        log.info("🔚 End of stream")
+                        await raw_token_queue.put(data)
+                        log.info("🔚 End of stream from model for client")
                         return
                     token = data["token"]
                     await raw_token_queue.put(token)
                 elif "error" in data:
                     log.error(f"💥 Model error: {data['error']}")
-                    write_queue.put(data)
+                    await raw_token_queue.put(data)
                     return
-            await raw_token_queue.put(None)
     except Exception as e:
         log.exception(f"🔥 Stream error: {str(e)}")
         data={"error": str(e),
@@ -342,6 +343,8 @@ async def websocket_endpoint(ws: WebSocket):
         await assembler_task
         await dispatcher_task
         writer_thread.join(timeout=5)
+        await ws.send_json({"token": None, "flag": True})
+        log.info("🔚Processed completely for client %s",client)
         if writer_thread.is_alive():
             log.warning("⚠️ Writer thread did not terminate cleanly for client %s", client)
         else:
