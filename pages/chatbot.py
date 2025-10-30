@@ -190,7 +190,7 @@ def main():
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'selected_llm' not in st.session_state:
-        st.session_state.selected_llm = "llama-3.2"
+        st.session_state.selected_llm = "gpt-4"
     if 'selected_guardrail' not in st.session_state:
         st.session_state.selected_guardrail = "moderate"
     if "gen_id" not in st.session_state:

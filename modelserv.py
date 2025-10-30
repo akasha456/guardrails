@@ -184,13 +184,12 @@ async def websocket_endpoint_gpt4(ws: WebSocket):
     client_host = ws.client.host
     log.info("Client %s connected (Id: %s) to GPT-4 endpoint", client_host, conn_id)
     time_start = datetime.datetime.now()
-    
     try:
         msg = await ws.receive_json()
         model = msg.get("model", "gpt-4-turbo")  # or "gpt-4", "gpt-4o", etc.
         messages = msg.get("messages")
         stream = msg.get("stream", True)
-
+        log.info("contents of messages: %s, stream: %s,model: %s", messages, stream, model)
         if not messages:
             await manager.send_json(conn_id, {"error": "Missing 'messages' in payload"})
             return
@@ -199,14 +198,15 @@ async def websocket_endpoint_gpt4(ws: WebSocket):
             try:
                 # Use async streaming with OpenAI
                 stream_response = await openai_client.chat.completions.create(
-                    model=model,
+                    model="gpt-5",
                     messages=messages,
                     stream=True,
                     temperature=0.7
                 )
-
+                log.info("stream_response: %s", stream_response)
                 async for chunk in stream_response:
                     delta = chunk.choices[0].delta
+                    log.info("delta: %s", delta)
                     if delta.content:
                         await manager.send_json(conn_id, {"token": delta.content})
 
