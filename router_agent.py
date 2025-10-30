@@ -48,6 +48,13 @@ VLLM_TEMPLATE={
     ],
     "stream": True
 }
+KIMI_TEMPLATE={
+    "model": "moonshotai/kimi-k2-0905",
+    "messages": [
+    {"role": "user", "content": "Hello!"}
+    ],
+    "stream": True
+}
 
 def router(data: dict) -> Tuple[str, Dict[str, Any]]:
     prompt = data.get("prompt", "").strip()
@@ -82,8 +89,12 @@ def router(data: dict) -> Tuple[str, Dict[str, Any]]:
     elif model_key == "vllm":
         payload = VLLM_TEMPLATE.copy()
         payload["messages"][0]["content"] = prompt
+    elif model_key == "kimi":
+        payload = KIMI_TEMPLATE.copy()
+        payload["messages"][0]["content"] = prompt
     else:
         log.error("User with username %s sent unknown model %s with ip %s", data.get("username"),model_name,data.get("ip"))
         return "error", {"error": "Unknown model"}
+ 
 
     return model_url, payload
