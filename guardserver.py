@@ -283,6 +283,14 @@ async def websocket_endpoint(ws: WebSocket):
             guard_input.validate(prompt, on="input")
             log.info("✅ Input guard passed")
         except Exception as e:
+            error_msg = str(e)
+            user_friendly_msg = {
+                "error": {
+                    "message": "Your input contains restricted content:",
+                    "details": error_msg,
+                    "type": "input_validation"
+                }
+            }
             log.error(f"❌ Input validation failed: {str(e)}")
             subject = "🚨 Guardrails Input Violation Detected"
             body = f"""
@@ -296,7 +304,9 @@ async def websocket_endpoint(ws: WebSocket):
             Timestamp: {time.ctime()}
             """
             send_violation_email(subject, body)
-            await ws.send_json({"error": "Input validation failed"})
+            # await ws.send_json({"error": "Input validation failed"})
+            await ws.send_json(user_friendly_msg)
+
             return
 
         # Start Routing

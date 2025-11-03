@@ -303,18 +303,32 @@ def main():
                         if isinstance(payload, dict):
                             if "error" in payload:
                                 thinking.empty()
-                                error_ui = "Validation error has occurred. Sorry, try your response again."
-                                placeholder.error(error_ui)
-                                st.session_state.messages[idx]["content"]  = error_ui
-                                st.session_state.messages[idx]["metadata"] = f"🛡️ guard-server rejected"
+                                error_data = payload["error"]
+
+                                if isinstance(error_data, dict):
+                                    error_message = f"""
+⚠️ **Content Warning**
+- Type: {error_data.get('message', 'Unknown Error')}
+- Details: {error_data.get('details', 'No additional details')}
+
+*Please revise and try again.*
+"""
+                                else:
+                                    error_message = f"⚠️ Error: {str(error_data)}"
+                                
+                                placeholder.error(error_message)
+                                st.session_state.messages[idx]["content"] = error_message
+                                st.session_state.messages[idx]["metadata"] = "🛡️ Content filtered by guardrails"
                                 st.session_state.messages[idx]["feedback"] = {"rating": None, "comment": ""}
+                                
                                 logger.info(
-                                    "Assistant reply to user %s (%s) model=%s guard=%s : %s",
-                                    meta["username"], meta["ip"], meta["model"], meta["guard"], error_ui
+                                    "Validation error for user %s (%s) model=%s guard=%s : %s",
+                                    meta["username"], meta["ip"], meta["model"], meta["guard"], error_message
                                 )
-                                st.rerun()  
+                                st.rerun()
                                 stream_ok = False
                                 break
+                               
                             elif "response" in payload:
                                 thinking.empty()
                                 # ---- simulated typing ----
