@@ -312,11 +312,12 @@ def main():
 
                                 if isinstance(error_data, dict):
                                     error_message = f"""
-                                    ⚠️ **Content Warning**
-                                    - Type: {error_data.get('message', 'Unknown Error')}
-                                    - Details: {error_data.get('details', 'No additional details')}
+                                    ⚠️ **Content Warning** \n- Please revise and try again.
+                                    \n- Type: {error_data.get('message', 'Unknown Error')}
+                                    \n- Details: {error_data.get('details', 'No additional details')}
+                                    
 
-                                    *Please revise and try again.*
+                                    
                                     """
                                 else:
                                     error_message = f"⚠️ Error: {str(error_data)}"
