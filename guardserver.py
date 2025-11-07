@@ -200,12 +200,12 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
         item = write_queue.get()
         if "token" in item:
             if item.get("token", False) is None:
-                ws.send_json({"token": "None", "flag":"fuck you bitch"}) 
+                safe_send({"type": "ended", "timestamp": time.time()})          
                 break
         status, seq, text, ts = item
         if status == "fail":
             log.error("❌ Validation failed → aborting stream")
-            safe_send({"error": "Guard validation failed on output"})
+            safe_send({"type": "error", "token": "Guard validation failed on output"})
             while not write_queue.empty():
                 try:
                     write_queue.get_nowait()
@@ -213,11 +213,11 @@ def websocket_writer(write_queue: queue.Queue, ws: WebSocket, main_loop):
                     pass
             break
         if seq == expected_seq:
-            safe_send({"token": text})
+            safe_send({"type": "token", "token": text})
             expected_seq += 1
             while expected_seq in pending:
                 txt, _ = pending.pop(expected_seq)
-                safe_send({"token": txt})
+                safe_send({"type": "token", "token": txt})
                 expected_seq += 1
         else:
             pending[seq] = (text, ts)
@@ -262,6 +262,7 @@ async def websocket_endpoint(ws: WebSocket):
         guard_type = data.get("guard", "")
         client = data.get("ip", ws.client.host)
         log.info("Client %s connected into guardserver endpoint for generation.", client)
+        await ws.send_json({"type": "started", "timestamp": time.time()})
         meta = {
             "username": username,
             "model": model,
@@ -270,9 +271,9 @@ async def websocket_endpoint(ws: WebSocket):
             "ip": client,
             "timestamp": time.time(),
         }
-
         if not prompt:
-            await ws.send_json({"error": "Prompt is required"})
+            await ws.send_json({"type": "error", 
+                                "token": "Prompt is required"})
             log.error("❌ Missing prompt for %s (%s)", username, client)
             return
 
@@ -285,7 +286,8 @@ async def websocket_endpoint(ws: WebSocket):
         except Exception as e:
             error_msg = str(e)
             user_friendly_msg = {
-                "error": {
+                "type": "error",
+                "token": {
                     "message": "Your input contains restricted content:",
                     "details": error_msg,
                     "type": "input_validation"
@@ -331,7 +333,7 @@ async def websocket_endpoint(ws: WebSocket):
         await assembler_task
         await dispatcher_task
         writer_thread.join(timeout=5)
-        await ws.send_json({"token": None, "flag": True})
+        await ws.send_json({"type": "ended", "timestamp": time.time()})
         log.info("🔚Processed completely for client %s",client)
         if writer_thread.is_alive():
             log.warning("⚠️ Writer thread did not terminate cleanly for client %s", client)
@@ -343,7 +345,7 @@ async def websocket_endpoint(ws: WebSocket):
     except Exception as exc:
         log.exception("Error in WebSocket handler for %s: %s", client, str(exc))
         try:
-            await ws.send_json({"error": f"Server error: {str(exc)}"})
+            await ws.send_json({"type": "error", "token": f"Server error: {str(exc)}"})
         except:
             pass
 

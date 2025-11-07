@@ -56,7 +56,8 @@ class WsClient:
                 async for msg in ws:
                     data = json.loads(msg)
                     self._q.put(data)
-                    if data.get("token") is None or "error" in data:
+                    logger.info(f"Received data: {data}")
+                    if data.get("type") == "ended" or data.get("type") == "error" in data:
                         logger.info(f"Stream ended for client {meta['username']}")
                         break
         except Exception as e:
@@ -70,13 +71,15 @@ class WsClient:
             except queue.Empty:
                 break
             if isinstance(item, dict):
-                if "token" in item:
-                    if item["token"] is None:
-                        break
-                    yield item["token"]
+                if item.get("type") == "started":
+                    logger.info(f"Stream started for client")
+                    continue
+                elif item.get("type") == "ended":
+                    logger.info(f"Stream ended for client")
+                    break
                 else:
                     yield item
-                    if "error" in item:
+                    if item.get("type") == "error":
                         break
             else:
                 yield str(item)
@@ -298,21 +301,23 @@ def main():
                     stream_ok = True
 
                     for payload in st.session_state.ws_client.stream():
+                        logger.info("Received payload from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                         if current_gen != st.session_state.gen_id:
                             break
                         if isinstance(payload, dict):
-                            if "error" in payload:
+                            if payload.get("type") == "error":
+                                logger.info("Received error from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                                 thinking.empty()
-                                error_data = payload["error"]
+                                error_data = payload["token"]
 
                                 if isinstance(error_data, dict):
                                     error_message = f"""
-⚠️ **Content Warning**
-- Type: {error_data.get('message', 'Unknown Error')}
-- Details: {error_data.get('details', 'No additional details')}
+                                    ⚠️ **Content Warning**
+                                    - Type: {error_data.get('message', 'Unknown Error')}
+                                    - Details: {error_data.get('details', 'No additional details')}
 
-*Please revise and try again.*
-"""
+                                    *Please revise and try again.*
+                                    """
                                 else:
                                     error_message = f"⚠️ Error: {str(error_data)}"
                                 
@@ -328,22 +333,14 @@ def main():
                                 st.rerun()
                                 stream_ok = False
                                 break
-                               
-                            elif "response" in payload:
+                            else:
                                 thinking.empty()
+                                logger.info("Received token from guard-server for user %s (%s): %s", meta["username"], meta["ip"], payload)
                                 # ---- simulated typing ----
-                                for ch in payload["response"]:
+                                for ch in payload["token"]:
                                     full_text += ch
                                     placeholder.markdown(full_text + "▌")
-                                    time.sleep(0.015)   # <-- controls speed
-                                break
-                        else:
-                            thinking.empty()
-                            # ---- simulated typing ----
-                            for ch in payload:
-                                full_text += ch
-                                placeholder.markdown(full_text + "▌")
-                                time.sleep(0.015)       # <-- controls speed
+                                    time.sleep(0.015)       # <-- controls speed
 
                     if stream_ok and current_gen == st.session_state.gen_id:
                         placeholder.markdown(full_text)  # final text without cursor
