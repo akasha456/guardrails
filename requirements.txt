@@ -171,3 +171,21 @@ yarl
 zipp
 zope.interface
 zstandard
+fastapi
+uvicorn
+websockets
+requests
+python-dotenv
+guardrails
+spacy
+ollama
+openai
+streamlit
+pydantic
+aiohttp
+typing_extensions
+
+# guardrails hub install hub://guardrails/toxic_language
+# guardrails hub install hub://guardrails/profanity_free
+# guardrails hub install hub://guardrails/detect_pii
+# guardrails hub install hub://guardrails/ban_list
