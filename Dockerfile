@@ -1,24 +1,42 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# Set working directory
+ARG GUARDRAILS_TOKEN
+
+ENV VIRTUAL_ENV=/opt/envguardrails
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
 WORKDIR /app
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
 
-# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc g++ git && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download spacy model
-RUN python -m spacy download en_core_web_sm
 
-# Copy the rest of the application
+RUN python -m nltk.downloader -d /opt/nltk_data punkt
+ENV NLTK_DATA=/opt/nltk_data
+
+
+RUN python -m spacy download en_core_web_sm && \
+    python -m spacy link en_core_web_sm en
+
+
+RUN if [ -z "$GUARDRAILS_TOKEN" ]; then \
+        echo "❌ Error: GUARDRAILS_TOKEN not provided. Build with: --build-arg GUARDRAILS_TOKEN=grdk_..."; \
+        exit 1; \
+    fi && \
+    echo "➡️ Configuring Guardrails..." && \
+    guardrails configure \
+        --enable-metrics \
+        --enable-remote-inferencing \
+        --token "$GUARDRAILS_TOKEN"
+
+# Copy application code
 COPY . .
 
-# Expose ports for all services
-EXPOSE 8501 8765 5000
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-
-# The entrypoint script will be specified in docker-compose.yml
+CMD ["python", "--version"]

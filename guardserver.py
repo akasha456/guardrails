@@ -341,7 +341,7 @@ async def websocket_endpoint(ws: WebSocket):
             log.info("✅ Streaming completed for client %s", client)
 
     except WebSocketDisconnect:
-        log.info("Client %s disconnected", client)
+        log.info("Client %s disconnected", ws.client.host)
     except Exception as exc:
         log.exception("Error in WebSocket handler for %s: %s", client, str(exc))
         try:

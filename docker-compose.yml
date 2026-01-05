@@ -1,38 +1,45 @@
-version: '3.8'
-
 services:
-  streamlit:
-    build: .
-    command: streamlit run main.py --server.address 0.0.0.0
+  streamlit-frontend:
+    image: anazmuhdd/guardrails-ai:latest
+    build:
+      context: .
+      args:
+        - GUARDRAILS_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnaXRodWJ8MTYwOTQxMjczIiwiYXBpS2V5SWQiOiJhMzAzZWFjMy05Yzg1LTQ4NzctOWUwOC0xMzNkMDZlZjBjZTEiLCJzY29wZSI6InJlYWQ6cGFja2FnZXMiLCJwZXJtaXNzaW9ucyI6W10sImlhdCI6MTc2NTg4NjQxOSwiZXhwIjoxNzczNjYyNDE5fQ.oefbRysj4x0SmIoIA4KcehFD1Vd6DIfVQm6JYPNUJSc
+    container_name: guardrails-frontend
     ports:
       - "8501:8501"
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - guardrails-network
-
-  modelserv:
-    build: .
-    command: python -m uvicorn modelserv:app --host 0.0.0.0 --port 8765
-    ports:
-      - "8765:8765"
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - guardrails-network
+    env_file:
+      - .env
+    command: >
+      streamlit run main.py
+    restart: unless-stopped
 
   guardserver:
-    build: .
-    command: python -m uvicorn guardserver:app --host 0.0.0.0 --port 5000
+    image: anazmuhdd/guardrails-ai:latest
+    build:
+      context: .
+      args:
+        - GUARDRAILS_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnaXRodWJ8MTYwOTQxMjczIiwiYXBpS2V5SWQiOiJhMzAzZWFjMy05Yzg1LTQ4NzctOWUwOC0xMzNkMDZlZjBjZTEiLCJzY29wZSI6InJlYWQ6cGFja2FnZXMiLCJwZXJtaXNzaW9ucyI6W10sImlhdCI6MTc2NTg4NjQxOSwiZXhwIjoxNzczNjYyNDE5fQ.oefbRysj4x0SmIoIA4KcehFD1Vd6DIfVQm6JYPNUJSc
+    container_name: guardrails-guardserver
     ports:
       - "5000:5000"
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - guardrails-network
+    env_file:
+      - .env
+    command: >
+      python -c "import os;from dotenv import load_dotenv;load_dotenv();import uvicorn;uvicorn.run('guardserver:app', host='0.0.0.0', port=5000, log_level='info')"
+    restart: unless-stopped
 
-networks:
-  guardrails-network:
-    driver: bridge
+  modelserv:
+    image: anazmuhdd/guardrails-ai:latest
+    build:
+      context: .
+      args:
+        - GUARDRAILS_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnaXRodWJ8MTYwOTQxMjczIiwiYXBpS2V5SWQiOiJhMzAzZWFjMy05Yzg1LTQ4NzctOWUwOC0xMzNkMDZlZjBjZTEiLCJzY29wZSI6InJlYWQ6cGFja2FnZXMiLCJwZXJtaXNzaW9ucyI6W10sImlhdCI6MTc2NTg4NjQxOSwiZXhwIjoxNzczNjYyNDE5fQ.oefbRysj4x0SmIoIA4KcehFD1Vd6DIfVQm6JYPNUJSc
+    container_name: guardrails-modelserv
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    command: >
+      python -c "import os;from dotenv import load_dotenv;load_dotenv();import uvicorn;host = os.getenv('HOST', '0.0.0.0');port = int(os.getenv('PORT', '8000'));uvicorn.run('modelserv:app', host=host, port=port, log_level='info')"
+    restart: unless-stopped

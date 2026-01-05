@@ -11,7 +11,7 @@ import threading
 
 logger = logging.getLogger("chatbot")
 ui_logger = logging.getLogger("ui_response")
-WS_URL = "ws://localhost:5000/guard"  # guard-server
+WS_URL = "ws://172.30.7.93:5000/guard"  # guard-server
 
 
 # ------------------------------------------------------------------
