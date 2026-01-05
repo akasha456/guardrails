@@ -34,7 +34,14 @@ RUN if [ -z "$GUARDRAILS_TOKEN" ]; then \
     guardrails configure \
         --enable-metrics \
         --enable-remote-inferencing \
-        --token "$GUARDRAILS_TOKEN"
+        --token "$GUARDRAILS_TOKEN" && \
+    echo "➡️ Installing Guardrails hub validators..." && \
+    guardrails hub install hub://guardrails/toxic_language && \
+    guardrails hub install hub://guardrails/profanity_free && \
+    guardrails hub install hub://guardrails/detect_pii && \
+    echo "✅ Guardrails configured successfully."
+
+
 
 # Copy application code
 COPY . .
