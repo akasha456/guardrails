@@ -94,7 +94,7 @@ def get_client_ip():
         return "localhost"
 
 
-LLM_MODELS = ["llama-3.2", "claude-2", "gpt-4", "VLLM"]
+LLM_MODELS = ["llama-3.2", "claude-2", "gpt-4", "VLLM", "kimi"]
 GUARDRAIL_MODELS = ["none", "moderate", "strict"]
 
 
@@ -193,7 +193,7 @@ def main():
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'selected_llm' not in st.session_state:
-        st.session_state.selected_llm = "gpt-4"
+        st.session_state.selected_llm = "llama-3.2"
     if 'selected_guardrail' not in st.session_state:
         st.session_state.selected_guardrail = "moderate"
     if "gen_id" not in st.session_state:

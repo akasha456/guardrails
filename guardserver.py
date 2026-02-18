@@ -115,6 +115,11 @@ async def assemble_sentences(raw_token_queue, chunk_queue):
                         chunk_seq += 1
                     await chunk_queue.put(token)
                     return
+            
+            if token is None:
+                log.info("ℹ️ Received None token (stream ended or error), stopping assembly.")
+                return
+
             raw_buffer += token
             last_token_time = time.time()
             complete, remaining = extract_complete_sentences_spacy(raw_buffer)
@@ -313,6 +318,12 @@ async def websocket_endpoint(ws: WebSocket):
 
         # Start Routing
         url, model_payload = router(meta)
+        if url == "error":
+            error_msg = model_payload.get("error", "Unknown routing error")
+            log.error(f"❌ Routing failed: {error_msg}")
+            await ws.send_json({"type": "error", "token": f"Routing failed: {error_msg}"})
+            return
+
         raw_token_queue = asyncio.Queue()
         chunk_queue = asyncio.Queue()
         write_queue = queue.Queue()

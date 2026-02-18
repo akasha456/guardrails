@@ -6,7 +6,8 @@ MODELS = {
     "llama-3.2": "ws://localhost:8765/llama3.2",
     "claude-2": "ws://localhost:8765/claude2",
     "gpt-4": "ws://localhost:8765/gpt4",
-    "vllm": "ws://localhost:8765/vllm"
+    "vllm": "ws://localhost:8765/vllm",
+    "kimi": "ws://localhost:8765/kimi"
 }
 
 
@@ -49,9 +50,9 @@ VLLM_TEMPLATE={
     "stream": True
 }
 KIMI_TEMPLATE={
-    "model": "moonshotai/kimi-k2-0905",
+    "model": "moonshotai/kimi-k2-instruct-0905",
     "messages": [
-    {"role": "user", "content": "Hello!"}
+    {"role": "user", "content": ""}
     ],
     "stream": True
 }
@@ -90,7 +91,8 @@ def router(data: dict) -> Tuple[str, Dict[str, Any]]:
         payload = VLLM_TEMPLATE.copy()
         payload["messages"][0]["content"] = prompt
     elif model_key == "kimi":
-        payload = KIMI_TEMPLATE.copy()
+        import copy
+        payload = copy.deepcopy(KIMI_TEMPLATE)
         payload["messages"][0]["content"] = prompt
     else:
         log.error("User with username %s sent unknown model %s with ip %s", data.get("username"),model_name,data.get("ip"))
